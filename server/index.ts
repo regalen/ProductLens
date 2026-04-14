@@ -13,7 +13,7 @@ import pipelinesRouter from "./routes/pipelines.js";
 import workflowsRouter from "./routes/workflows.js";
 import ingestRouter from "./routes/ingest.js";
 import processingRouter from "./routes/processing.js";
-import imagesRouter from "./routes/images.js";
+import imagesRouter, { publicImagesRouter } from "./routes/images.js";
 import exportRouter from "./routes/export.js";
 
 // Ensure data directories exist
@@ -51,6 +51,9 @@ async function startServer() {
 
   // Export routes are mounted at /api (they include full paths like /workflows/:id/export/xlsx)
   app.use("/api", exportRouter);
+
+  // Public image serving (must be before SPA catch-all)
+  app.use(publicImagesRouter);
 
   // Vite middleware
   if (process.env.NODE_ENV !== "production") {

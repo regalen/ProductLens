@@ -103,12 +103,14 @@ router.get("/previews/:id", authenticate, (req, res) => {
   res.sendFile(img.preview_path);
 });
 
+export default router;
+
 // --- Public image serving (no authentication) ---
-router.get("/images/:workflowId/:filename", (req, res) => {
+// Exported separately — must be mounted at "/" in index.ts, not under "/api"
+export const publicImagesRouter = Router();
+publicImagesRouter.get("/images/:workflowId/:filename", (req, res) => {
   const { workflowId, filename } = req.params;
   const filePath = path.join(PROCESSED_DIR, workflowId, filename);
   if (!fs.existsSync(filePath)) return res.status(404).send("Not found");
   res.sendFile(path.resolve(filePath));
 });
-
-export default router;
