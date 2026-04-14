@@ -13,6 +13,9 @@ RUN npm ci && npm cache clean --force
 COPY . .
 RUN npm run build
 
+# Production deps only (separate layer for smaller final image)
+RUN rm -rf node_modules && npm ci --omit=dev && npm cache clean --force
+
 # Production stage
 FROM node:20-slim
 
@@ -37,4 +40,4 @@ ENV WORKSPACE_DIR=/tmp/workspace
 
 EXPOSE 3446
 
-CMD ["npx", "tsx", "server/index.ts"]
+CMD ["node", "--import", "tsx", "server/index.ts"]
