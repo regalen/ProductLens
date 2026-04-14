@@ -1,0 +1,113 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+ProductLens is a full-stack image processing tool for automating ingestion, transformation, and export of product images. Built for Ingram Micro's content/catalog teams. Features multi-method image ingestion (upload, URL fetch, web scraping), custom processing pipelines (crop, resize, scale, convert, bulk rename), real-time previews, and bulk export (ZIP/XLSX).
+
+## Commands
+
+- `npm run dev` — Start the dev server (Express + Vite, port configurable via `PORT` env, default 3000)
+- `npm run build` — Production build via Vite
+- `npm run lint` — Type-check with `tsc --noEmit` (strict mode enabled)
+- `npm test` — Run all tests with Vitest
+- `npm run test:watch` — Run tests in watch mode
+- `npm run clean` — Remove dist directory
+- `docker compose up --build` — Build and run in Docker (port 3446)
+
+## Environment
+
+Copy `.env.example` to `.env.local` and set `JWT_SECRET`. If `JWT_SECRET` is not set, a random secret is generated on each server start (sessions won't survive restarts).
+
+Key env vars: `PORT` (default 3000, Docker default 3446), `BASE_URL` (external URL for public image links), `JWT_SECRET`, `CORS_ORIGIN` (default `*`), `DATA_DIR` (default `./data`, Docker `/data`), `WORKSPACE_DIR` (default `DATA_DIR/workspace`, Docker `/tmp/workspace`).
+
+## Architecture
+
+**Full-stack app** — Express backend (`server/`) serves the API and the Vite-bundled React frontend. No separate processes.
+
+### Backend (`server/`, `db.ts`)
+
+```
+server/
+  index.ts              — Express app setup, middleware, Vite integration, listen
+  config.ts             — PORT, BASE_URL, DATA_DIR, UPLOAD_DIR, PREVIEW_DIR, PROCESSED_DIR, WORKSPACE_DIR, CORS_ORIGIN, JWT_SECRET
+  types.ts              — DB row interfaces (UserRow, WorkflowRow, ImageRow, PipelineRow)
+  middleware/
+    auth.ts             — authenticate(), requireRole() middleware
+  routes/
+    auth.ts             — login, logout, change-password, me
+    admin.ts            — user CRUD (admin only)
+    pipelines.ts        — pipeline CRUD (pipeline_editor + admin)
+    workflows.ts        — workflow CRUD + reset (ownership enforced)
+    ingest.ts           — file upload, URL fetch, web scraping (with SSRF protection)
+    processing.ts       — processImage() helper, preview + process routes
+    images.ts           — image delete/patch, asset/preview serving (auth + ownership), public /images/:workflowId/:filename (no auth)
+    export.ts           — XLSX and ZIP export (ownership enforced)
+  utils/
+    validation.ts       — validatePassword, validateRole, validateWorkflowName, validatePipelineSteps
+    url.ts              — isPrivateUrl() for SSRF protection
+```
+
+- `db.ts` (project root) initializes SQLite via `better-sqlite3` at `data/database.sqlite`. Schema with migration guards. Seeds default admin (admin/admin). Indexes on foreign keys.
+- All workflow-scoped routes enforce ownership (`WHERE user_id = ?`).
+- Image uploads restricted to image MIME types, 50MB max per file.
+- Image processing uses Sharp. Key operations: "Resize Canvas" squares with sampled background; "Crop Content" uses `.trim()` or manual extraction.
+- Web scraping uses Axios + Cheerio with multi-agent retry strategy. SSRF protection blocks private IPs.
+- Bulk Rename uses workflow name as prefix with iterating index (e.g., `Workflow_Name-1.jpg`).
+- Processed files stored in `data/processed/{workflowId}/{filename}` subdirectories to prevent collisions.
+- Public image URLs: `/images/{workflowId}/{filename}` — no auth, used in XLSX exports and "Copy Asset URL".
+- Exports: JSZip for ZIP, ExcelJS for XLSX (uses `BASE_URL` for public image links).
+
+## Docker
+
+- `Dockerfile` — Multi-stage build (node:20-slim) with native deps for sharp, better-sqlite3, canvas. Includes wget for healthcheck. Sets `DATA_DIR=/data` and `WORKSPACE_DIR=/tmp/workspace`.
+- `docker-compose.yml` — Pulls from `ghcr.io/regalen/productlens:latest`. Port 3446. Two volumes: `app-data:/data` (persistent DB + images), `app-workspace:/tmp/workspace` (ephemeral processing). Healthcheck via wget against `/api/health`. Env vars: `PORT`, `BASE_URL`, `JWT_SECRET`, `CORS_ORIGIN`.
+- `.dockerignore` — Excludes node_modules, dist, data, .git, .env files.
+- Image processing uses `WORKSPACE_DIR` for temp files during processing, then moves to final location. This keeps the workspace volume ephemeral and separate from persistent data.
+
+## CI/CD
+
+- `.github/workflows/build.yml` — On every push: lint, test, then build and push Docker image to GHCR. Tags: `sha-<commit>` on all branches, `latest` on default branch. Uses `docker/metadata-action` for tag management.
+
+### Frontend (`src/`)
+
+- React 19 + React Router DOM v7 + Tailwind CSS v4 + shadcn/ui (base-nova style).
+- Path alias: `@/*` maps to the project root (not `src/`).
+- State: AuthContext for auth, local component state elsewhere.
+- `src/pages/` — Route-level components: Dashboard, Login, WorkflowView, PipelineManager, UserManagement, ChangePassword.
+- `src/components/` — Feature components including Layout, PipelineBuilder, WorkflowStages/.
+- `components/` (root) — shadcn UI primitives.
+- `src/types.ts` — Shared TypeScript interfaces for Pipeline, Workflow, WorkflowImage, User.
+- PipelineBuilder uses `Reorder.Group` from Framer Motion for drag-and-drop step sequencing.
+- Global Axios interceptor handles 401 redirects.
+- Animations via `motion/react` (Framer Motion). Icons via Lucide React.
+
+### Data Flow
+
+Workflows progress through stages: **ingest** (upload/URL/scrape images) -> **configure** (select pipeline) -> **preview** (see processed previews) -> **processing** -> **completed** (download ZIP/XLSX). WorkflowView polls the backend at 3s intervals, stopping when status is "completed".
+
+### Tests (`tests/`)
+
+- Vitest with globals enabled, Node environment.
+- `tests/utils/url.test.ts` — SSRF protection tests
+- `tests/utils/validation.test.ts` — Input validation tests
+- `tests/middleware/auth.test.ts` — Auth middleware tests (mocked DB + JWT)
+
+## TypeScript
+
+Strict mode is enabled (`strict: true`, `noUncheckedIndexedAccess: true`). DB row types are defined in `server/types.ts`. Express `Request` is augmented with `user` in `server/middleware/auth.ts`.
+
+## Known Limitations
+
+- SQLite is used for simplicity; not suited for high-concurrency production.
+- WorkflowView uses 3s polling; no WebSocket support yet.
+- Local filesystem storage only (no S3/GCS).
+- Cheerio-based scraping cannot handle JavaScript-heavy sites.
+
+## Design Tokens
+
+- Primary blue: `#0077d4`
+- Font: Inter (loaded via Google Fonts)
+- App name is "ProductLens" (case-sensitive, no spaces)
+- Header nav items: Image Processing, Reporting, Add Ons, Taxonomy Mapping

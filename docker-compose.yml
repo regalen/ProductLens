@@ -1,0 +1,32 @@
+services:
+  productlens:
+    image: ghcr.io/regalen/productlens:latest
+    container_name: productlens
+    ports:
+      - "3446:3446"
+    volumes:
+      # Persistent database storage
+      - app-data:/data
+      # Temporary workspace for image processing
+      - app-workspace:/tmp/workspace
+    environment:
+      - PORT=3446
+      # Set to the public-facing URL of this instance (used in external download URLs)
+      - BASE_URL=https://images.example.com
+      # Generate a strong random secret: openssl rand -hex 32
+      - JWT_SECRET=replace-with-a-strong-random-secret
+      # Restrict CORS to your domain (required in production)
+      - CORS_ORIGIN=https://your-domain.com
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3446/api/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+volumes:
+  # SQLite database and other persistent data
+  app-data:
+  # Processing workspace (ephemeral but survives container restarts)
+  app-workspace:

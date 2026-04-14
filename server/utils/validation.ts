@@ -1,0 +1,36 @@
+export function validatePassword(pw: string): string | null {
+  if (!pw || pw.length < 8) return "Password must be at least 8 characters";
+  return null;
+}
+
+export function validateRole(role: string): boolean {
+  return ["user", "pipeline_editor", "admin"].includes(role);
+}
+
+export function validateWorkflowName(name: string): string | null {
+  if (!name || name.trim().length === 0) return "Name is required";
+  if (name.length > 200) return "Name too long";
+  return null;
+}
+
+export function validatePipelineSteps(steps: unknown): string | null {
+  if (!Array.isArray(steps) || steps.length === 0)
+    return "At least one step is required";
+  const validTypes = [
+    "resize_canvas",
+    "crop_content",
+    "convert",
+    "scale_image",
+    "rename",
+  ];
+  for (const step of steps) {
+    if (
+      !step ||
+      typeof step !== "object" ||
+      !("type" in step) ||
+      !validTypes.includes((step as any).type)
+    )
+      return `Invalid step type`;
+  }
+  return null;
+}

@@ -1,0 +1,5 @@
+{
+  "name": "ProductLens",
+  "description": "Professional image processing pipeline for product photography. Crop, resize, convert, and scrape images with ease.",
+  "requestFramePermissions": []
+}
