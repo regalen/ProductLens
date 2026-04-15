@@ -13,6 +13,16 @@ export function validateWorkflowName(name: string): string | null {
   return null;
 }
 
+export const PIPELINE_DESCRIPTION_MAX = 500;
+
+export function validatePipelineDescription(desc: unknown): string | null {
+  if (desc === undefined || desc === null || desc === "") return null;
+  if (typeof desc !== "string") return "Description must be a string";
+  if (desc.length > PIPELINE_DESCRIPTION_MAX)
+    return `Description must be ${PIPELINE_DESCRIPTION_MAX} characters or fewer`;
+  return null;
+}
+
 export function validatePipelineSteps(steps: unknown): string | null {
   if (!Array.isArray(steps) || steps.length === 0)
     return "At least one step is required";

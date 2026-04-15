@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, Save, ArrowLeft, Settings2, Loader2, AlertCircle, Edit2, Globe, Lock } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Pipeline, PipelineStep } from '../types';
+import { Pipeline, PipelineStep, PIPELINE_DESCRIPTION_MAX } from '../types';
 import { PipelineBuilder } from '../components/PipelineBuilder';
 import { useAuth } from '../contexts/AuthContext';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -25,6 +26,7 @@ export function PipelineManager() {
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
+  const [newDescription, setNewDescription] = useState('');
   const [newSteps, setNewSteps] = useState<PipelineStep[]>([]);
   const [isShared, setIsShared] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -62,15 +64,27 @@ export function PipelineManager() {
       return;
     }
     
+    if (newDescription.length > PIPELINE_DESCRIPTION_MAX) {
+      setError(`Description must be ${PIPELINE_DESCRIPTION_MAX} characters or fewer.`);
+      return;
+    }
+
     setIsSaving(true);
     setError(null);
     try {
+      const payload = {
+        name: newName,
+        steps: newSteps,
+        isShared,
+        description: newDescription.trim() || null,
+      };
       if (editingId) {
-        await axios.patch(`/api/pipelines/${editingId}`, { name: newName, steps: newSteps, isShared });
+        await axios.patch(`/api/pipelines/${editingId}`, payload);
       } else {
-        await axios.post('/api/pipelines', { name: newName, steps: newSteps, isShared });
+        await axios.post('/api/pipelines', payload);
       }
       setNewName('');
+      setNewDescription('');
       setNewSteps([]);
       setIsShared(false);
       setIsCreating(false);
@@ -86,6 +100,7 @@ export function PipelineManager() {
 
   const handleEdit = (pipeline: Pipeline) => {
     setNewName(pipeline.name);
+    setNewDescription(pipeline.description ?? '');
     setNewSteps(pipeline.steps);
     setIsShared(pipeline.isShared);
     setEditingId(pipeline.id);
@@ -97,6 +112,7 @@ export function PipelineManager() {
     setIsCreating(false);
     setEditingId(null);
     setNewName('');
+    setNewDescription('');
     setNewSteps([]);
     setIsShared(false);
     setError(null);
@@ -125,7 +141,7 @@ export function PipelineManager() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="bg-slate-50">
       <main className="max-w-6xl mx-auto p-8 space-y-8">
         {!isCreating && (
           <div className="flex items-center justify-between">
@@ -133,8 +149,8 @@ export function PipelineManager() {
               <h2 className="text-2xl font-bold text-slate-900">Saved Pipelines</h2>
               <p className="text-slate-500 text-sm">Reusable processing templates</p>
             </div>
-            <Button 
-              onClick={() => setIsCreating(true)}
+            <Button
+              onClick={() => { setError(null); setIsCreating(true); }}
               className="bg-primary hover:bg-primary/90 text-white font-bold uppercase tracking-wider px-8"
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -180,11 +196,27 @@ export function PipelineManager() {
               <div className="space-y-6">
                 <div className="space-y-4">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Template Name</label>
-                  <Input 
-                    placeholder="e.g., E-commerce Standard" 
+                  <Input
+                    placeholder="e.g., E-commerce Standard"
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     className="bg-slate-50 border-slate-200 focus-visible:ring-primary/50 h-11"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Description</label>
+                    <span className={`text-[10px] font-bold uppercase tracking-widest ${newDescription.length > PIPELINE_DESCRIPTION_MAX ? 'text-red-500' : 'text-slate-300'}`}>
+                      {newDescription.length}/{PIPELINE_DESCRIPTION_MAX}
+                    </span>
+                  </div>
+                  <Textarea
+                    placeholder="What does this pipeline do? When should it be used?"
+                    value={newDescription}
+                    onChange={(e) => setNewDescription(e.target.value)}
+                    maxLength={PIPELINE_DESCRIPTION_MAX}
+                    rows={4}
+                    className="bg-slate-50 border-slate-200 focus-visible:ring-primary/50 resize-none"
                   />
                 </div>
                 <div className="flex items-center space-x-2 bg-slate-50 p-4 rounded-xl border border-slate-200">
@@ -264,6 +296,11 @@ export function PipelineManager() {
                     </div>
                   )}
                 </div>
+                {p.description && (
+                  <p className="text-xs text-slate-500 leading-relaxed line-clamp-3 whitespace-pre-wrap">
+                    {p.description}
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-2">
                   {p.steps.map((step, idx) => (
                     <Badge key={idx} variant="secondary" className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500 border-slate-200">
@@ -283,7 +320,7 @@ export function PipelineManager() {
         )}
       </main>
 
-      <Dialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+      <Dialog open={!!deleteId} onOpenChange={(open) => { if (!open) { setDeleteId(null); setError(null); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Pipeline</DialogTitle>

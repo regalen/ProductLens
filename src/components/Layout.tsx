@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Layout as LayoutIcon, LogOut, Users, Image as ImageIcon, BarChart3, Puzzle, Network } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
+import { Footer } from "./Footer";
 import {
   Tooltip,
   TooltipContent,
@@ -116,6 +117,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <main className="flex-1">
         {children}
       </main>
+
+      <Footer />
     </div>
   );
 }

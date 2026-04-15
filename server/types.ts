@@ -14,6 +14,7 @@ export interface WorkflowRow {
   status: string;
   user_id: string;
   pipeline_id: string | null;
+  steps: string | null;
   created_at: string;
 }
 
@@ -40,5 +41,6 @@ export interface PipelineRow {
   steps: string;
   user_id: string;
   is_shared: number;
+  description: string | null;
   created_at: string;
 }

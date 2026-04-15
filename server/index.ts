@@ -15,11 +15,22 @@ import ingestRouter from "./routes/ingest.js";
 import processingRouter from "./routes/processing.js";
 import imagesRouter, { publicImagesRouter } from "./routes/images.js";
 import exportRouter from "./routes/export.js";
+import { purgeExpiredWorkflows } from "./utils/purge.js";
 
 // Ensure data directories exist
 for (const dir of [DATA_DIR, UPLOAD_DIR, PREVIEW_DIR, PROCESSED_DIR, WORKSPACE_DIR]) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
+
+// Auto-purge workflows older than 7 days: once on startup (deferred to let
+// the server finish booting), then hourly. See server/utils/purge.ts.
+const HOUR_MS = 60 * 60 * 1000;
+setTimeout(() => {
+  try { purgeExpiredWorkflows(); } catch (e) { console.error("[purge] startup sweep failed", e); }
+}, 30_000);
+setInterval(() => {
+  try { purgeExpiredWorkflows(); } catch (e) { console.error("[purge] hourly sweep failed", e); }
+}, HOUR_MS);
 
 async function startServer() {
   const app = express();

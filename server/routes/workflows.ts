@@ -3,7 +3,11 @@ import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
 import db from "../../db.js";
 import { authenticate } from "../middleware/auth.js";
-import { validateWorkflowName } from "../utils/validation.js";
+import {
+  validatePipelineSteps,
+  validateWorkflowName,
+} from "../utils/validation.js";
+import { deleteWorkflowAndFiles } from "../utils/purge.js";
 
 const router = Router();
 
@@ -30,7 +34,7 @@ router.post("/", authenticate, (req, res) => {
 router.get("/:id", authenticate, (req, res) => {
   const workflow = db
     .prepare(
-      "SELECT id, name, status, user_id as userId, pipeline_id as pipelineId, created_at as createdAt FROM workflows WHERE id = ? AND user_id = ?"
+      "SELECT id, name, status, user_id as userId, pipeline_id as pipelineId, steps, created_at as createdAt FROM workflows WHERE id = ? AND user_id = ?"
     )
     .get(req.params.id, req.user!.id) as any;
   if (!workflow) return res.status(404).json({ error: "Workflow not found" });
@@ -38,7 +42,7 @@ router.get("/:id", authenticate, (req, res) => {
   let pipeline = null;
   if (workflow.pipelineId) {
     pipeline = db
-      .prepare("SELECT id, name, steps FROM pipelines WHERE id = ?")
+      .prepare("SELECT id, name, steps, description FROM pipelines WHERE id = ?")
       .get(workflow.pipelineId) as any;
     if (pipeline) {
       try {
@@ -47,6 +51,16 @@ router.get("/:id", authenticate, (req, res) => {
         return res.status(500).json({ error: "Corrupt pipeline data" });
       }
     }
+  }
+
+  if (workflow.steps) {
+    try {
+      workflow.steps = JSON.parse(workflow.steps);
+    } catch {
+      workflow.steps = null;
+    }
+  } else {
+    workflow.steps = null;
   }
 
   const images = db
@@ -58,15 +72,29 @@ router.get("/:id", authenticate, (req, res) => {
 });
 
 router.patch("/:id", authenticate, (req, res) => {
-  const { status, pipeline_id, name } = req.body;
+  const { status, pipeline_id, name, steps } = req.body;
+
+  if (steps !== undefined) {
+    const stepsError = validatePipelineSteps(steps);
+    if (stepsError) return res.status(400).json({ error: stepsError });
+  }
+
   if (status)
     db.prepare(
       "UPDATE workflows SET status = ? WHERE id = ? AND user_id = ?"
     ).run(status, req.params.id, req.user!.id);
-  if (pipeline_id)
+  if (pipeline_id) {
+    // Selecting a saved pipeline clears any inline one-time steps
     db.prepare(
-      "UPDATE workflows SET pipeline_id = ? WHERE id = ? AND user_id = ?"
+      "UPDATE workflows SET pipeline_id = ?, steps = NULL WHERE id = ? AND user_id = ?"
     ).run(pipeline_id, req.params.id, req.user!.id);
+  }
+  if (steps !== undefined) {
+    // Selecting one-time steps clears any saved-pipeline reference
+    db.prepare(
+      "UPDATE workflows SET steps = ?, pipeline_id = NULL WHERE id = ? AND user_id = ?"
+    ).run(JSON.stringify(steps), req.params.id, req.user!.id);
+  }
   if (name)
     db.prepare(
       "UPDATE workflows SET name = ? WHERE id = ? AND user_id = ?"
@@ -75,7 +103,7 @@ router.patch("/:id", authenticate, (req, res) => {
 });
 
 router.delete("/:id", authenticate, (req, res) => {
-  const workflowId = req.params.id;
+  const workflowId = req.params.id!;
   const userId = req.user!.id;
 
   // Check ownership
@@ -84,24 +112,7 @@ router.delete("/:id", authenticate, (req, res) => {
     .get(workflowId, userId);
   if (!workflow) return res.status(404).json({ error: "Workflow not found" });
 
-  const images = db
-    .prepare("SELECT * FROM images WHERE workflow_id = ?")
-    .all(workflowId) as any[];
-
-  // Wrap DB deletes in a transaction; do file cleanup only after success
-  db.transaction(() => {
-    db.prepare("DELETE FROM images WHERE workflow_id = ?").run(workflowId);
-    db.prepare("DELETE FROM workflows WHERE id = ?").run(workflowId);
-  })();
-
-  for (const img of images) {
-    if (img.local_path && fs.existsSync(img.local_path))
-      fs.unlinkSync(img.local_path);
-    if (img.preview_path && fs.existsSync(img.preview_path))
-      fs.unlinkSync(img.preview_path);
-    if (img.processed_path && fs.existsSync(img.processed_path))
-      fs.unlinkSync(img.processed_path);
-  }
+  deleteWorkflowAndFiles(workflowId);
 
   res.json({ success: true });
 });
@@ -123,7 +134,7 @@ router.delete("/:id/reset", authenticate, (req, res) => {
   db.transaction(() => {
     db.prepare("DELETE FROM images WHERE workflow_id = ?").run(workflowId);
     db.prepare(
-      "UPDATE workflows SET status = 'ingest', pipeline_id = NULL WHERE id = ?"
+      "UPDATE workflows SET status = 'ingest', pipeline_id = NULL, steps = NULL WHERE id = ?"
     ).run(workflowId);
   })();
 

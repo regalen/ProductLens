@@ -2,17 +2,21 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-const dbPath = path.join(process.cwd(), 'data', 'database.sqlite');
-const uploadDir = path.join(process.cwd(), 'data', 'uploads');
-const previewDir = path.join(process.cwd(), 'data', 'previews');
-const processedDir = path.join(process.cwd(), 'data', 'processed');
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
+const dbPath = path.join(DATA_DIR, 'database.sqlite');
 
-// Ensure directories exist
-[path.join(process.cwd(), 'data'), uploadDir, previewDir, processedDir].forEach(dir => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-});
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+// One-time migration for installs created before DATA_DIR was honored:
+// if a DB exists at the legacy path inside the image layer but not yet at
+// the persistent path, move it over so users don't lose data on upgrade.
+const legacyDbPath = path.join(process.cwd(), 'data', 'database.sqlite');
+if (legacyDbPath !== dbPath && !fs.existsSync(dbPath) && fs.existsSync(legacyDbPath)) {
+  console.log(`Migrating SQLite database from ${legacyDbPath} to ${dbPath}`);
+  fs.copyFileSync(legacyDbPath, dbPath);
+}
 
 const db = new Database(dbPath);
 db.pragma('foreign_keys = ON');
@@ -41,6 +45,7 @@ db.exec(`
     steps TEXT NOT NULL, -- JSON string
     user_id TEXT NOT NULL,
     is_shared BOOLEAN DEFAULT 0,
+    description TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
@@ -56,6 +61,9 @@ if (!columnExists('users', 'must_change_password')) {
 if (!columnExists('pipelines', 'is_shared')) {
   db.exec("ALTER TABLE pipelines ADD COLUMN is_shared BOOLEAN DEFAULT 0");
 }
+if (!columnExists('pipelines', 'description')) {
+  db.exec("ALTER TABLE pipelines ADD COLUMN description TEXT");
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS workflows (
@@ -64,6 +72,7 @@ db.exec(`
     status TEXT NOT NULL, -- ingest, configure, preview, processing, completed
     user_id TEXT NOT NULL,
     pipeline_id TEXT,
+    steps TEXT, -- JSON string for one-time (non-saved) pipeline steps
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (pipeline_id) REFERENCES pipelines(id)
@@ -87,6 +96,10 @@ db.exec(`
     FOREIGN KEY (workflow_id) REFERENCES workflows(id)
   );
 `);
+
+if (!columnExists('workflows', 'steps')) {
+  db.exec("ALTER TABLE workflows ADD COLUMN steps TEXT");
+}
 
 // Indexes for common query patterns
 db.exec(`

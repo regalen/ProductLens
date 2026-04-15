@@ -97,6 +97,12 @@ Workflows move through a five-stage pipeline:
 4. **Process** — Run the full pipeline on selected images
 5. **Export** — Download as ZIP or XLSX with public image URLs
 
+## Data Retention
+
+Workflows (and all associated data — uploaded source images, generated previews, processed outputs, and database rows) are **automatically deleted 7 days after creation**, regardless of status. This keeps the SQLite database and `/data` volume lean.
+
+**Export your results before the 7-day window closes.** Use the ZIP or XLSX export on the output stage to download everything you need. The purge runs hourly in the background and on server startup.
+
 ## Tech Stack
 
 - **Frontend:** React 19, React Router v7, Tailwind CSS v4, shadcn/ui, Framer Motion
@@ -115,4 +121,4 @@ npm run build        # Production build
 
 ## License
 
-All rights reserved.
+Released under the [MIT License](LICENSE).

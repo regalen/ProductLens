@@ -4,6 +4,7 @@ import {
   validateRole,
   validateWorkflowName,
   validatePipelineSteps,
+  validatePipelineDescription,
 } from '../../server/utils/validation.js';
 
 describe('validatePassword', () => {
@@ -110,5 +111,37 @@ describe('validatePipelineSteps', () => {
       { type: 'rename' },
     ];
     expect(validatePipelineSteps(steps)).toBeNull();
+  });
+});
+
+describe('validatePipelineDescription', () => {
+  it('accepts null', () => {
+    expect(validatePipelineDescription(null)).toBeNull();
+  });
+
+  it('accepts undefined', () => {
+    expect(validatePipelineDescription(undefined)).toBeNull();
+  });
+
+  it('accepts an empty string', () => {
+    expect(validatePipelineDescription('')).toBeNull();
+  });
+
+  it('accepts a short description', () => {
+    expect(validatePipelineDescription('Standard e-commerce pipeline')).toBeNull();
+  });
+
+  it('accepts exactly 500 characters', () => {
+    expect(validatePipelineDescription('a'.repeat(500))).toBeNull();
+  });
+
+  it('rejects 501 characters', () => {
+    expect(validatePipelineDescription('a'.repeat(501))).not.toBeNull();
+  });
+
+  it('rejects non-string values', () => {
+    expect(validatePipelineDescription(123)).not.toBeNull();
+    expect(validatePipelineDescription({})).not.toBeNull();
+    expect(validatePipelineDescription([])).not.toBeNull();
   });
 });

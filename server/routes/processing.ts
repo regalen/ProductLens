@@ -186,7 +186,7 @@ router.post("/workflows/:id/preview", authenticate, async (req, res) => {
     return res.status(404).json({ error: "Workflow not found" });
 
   const workflow = db
-    .prepare("SELECT pipeline_id FROM workflows WHERE id = ?")
+    .prepare("SELECT pipeline_id, steps FROM workflows WHERE id = ?")
     .get(workflowId) as any;
 
   let steps = req.body.pipeline;
@@ -200,6 +200,13 @@ router.post("/workflows/:id/preview", authenticate, async (req, res) => {
       } catch {
         return res.status(500).json({ error: "Corrupt pipeline data" });
       }
+    }
+  }
+  if (!steps && workflow?.steps) {
+    try {
+      steps = JSON.parse(workflow.steps);
+    } catch {
+      return res.status(500).json({ error: "Corrupt workflow steps" });
     }
   }
 
@@ -257,29 +264,34 @@ router.post("/workflows/:id/process", authenticate, async (req, res) => {
     return res.status(404).json({ error: "Workflow not found" });
 
   const workflow = db
-    .prepare("SELECT pipeline_id FROM workflows WHERE id = ?")
+    .prepare("SELECT pipeline_id, steps FROM workflows WHERE id = ?")
     .get(workflowId) as any;
 
-  if (!workflow?.pipeline_id) {
+  if (!workflow?.pipeline_id && !workflow?.steps) {
     return res
       .status(400)
       .json({ error: "No pipeline configured for this workflow" });
   }
 
-  const pipeline = db
-    .prepare("SELECT steps FROM pipelines WHERE id = ?")
-    .get(workflow.pipeline_id) as any;
-  if (!pipeline) {
-    return res
-      .status(400)
-      .json({ error: "Pipeline template not found" });
-  }
-
   let steps;
-  try {
-    steps = JSON.parse(pipeline.steps);
-  } catch {
-    return res.status(500).json({ error: "Corrupt pipeline data" });
+  if (workflow.pipeline_id) {
+    const pipeline = db
+      .prepare("SELECT steps FROM pipelines WHERE id = ?")
+      .get(workflow.pipeline_id) as any;
+    if (!pipeline) {
+      return res.status(400).json({ error: "Pipeline template not found" });
+    }
+    try {
+      steps = JSON.parse(pipeline.steps);
+    } catch {
+      return res.status(500).json({ error: "Corrupt pipeline data" });
+    }
+  } else {
+    try {
+      steps = JSON.parse(workflow.steps);
+    } catch {
+      return res.status(500).json({ error: "Corrupt workflow steps" });
+    }
   }
   const hasRename = steps.some((s: any) => s.type === "rename");
   const workflowData = db

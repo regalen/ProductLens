@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Link, useNavigate } from 'react-router-dom';
 import { LogIn, UserPlus, Loader2 } from 'lucide-react';
+import { Footer } from '../components/Footer';
 
 export function Login() {
   const [username, setUsername] = useState('');
@@ -28,7 +29,8 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+    <div className="min-h-screen flex flex-col bg-slate-50">
+      <div className="flex-1 flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-8 space-y-6 bg-white shadow-xl border-slate-200">
         <div className="text-center space-y-2">
           <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mx-auto mb-4">
@@ -69,6 +71,8 @@ export function Login() {
           </Button>
         </form>
       </Card>
+      </div>
+      <Footer />
     </div>
   );
 }

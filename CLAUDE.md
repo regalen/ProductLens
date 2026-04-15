@@ -104,6 +104,7 @@ Strict mode is enabled (`strict: true`, `noUncheckedIndexedAccess: true`). DB ro
 - WorkflowView uses 3s polling; no WebSocket support yet.
 - Local filesystem storage only (no S3/GCS).
 - Cheerio-based scraping cannot handle JavaScript-heavy sites.
+- Workflows are hard-purged 7 days after `created_at` by an hourly in-process sweep (see `server/utils/purge.ts`). All associated images, previews, and processed outputs are deleted alongside the workflow row.
 
 ## Design Tokens
 
@@ -111,3 +112,40 @@ Strict mode is enabled (`strict: true`, `noUncheckedIndexedAccess: true`). DB ro
 - Font: Inter (loaded via Google Fonts)
 - App name is "ProductLens" (case-sensitive, no spaces)
 - Header nav items: Image Processing, Reporting, Add Ons, Taxonomy Mapping
+
+## Release Management
+
+- **Versioning standard: Semantic Versioning (SemVer)** — `MAJOR.MINOR.PATCH`.
+  - **MAJOR** — incompatible / breaking changes.
+  - **MINOR** — new backwards-compatible functionality.
+  - **PATCH** — backwards-compatible bug fixes.
+- **Commit message convention: Conventional Commits.** Every commit subject must start with one of:
+  - `feat:` — new feature (implies a MINOR bump).
+  - `fix:` — bug fix (implies a PATCH bump).
+  - `chore:`, `docs:`, `refactor:`, `perf:`, `test:`, `build:`, `ci:`, `style:`, `revert:` — no version bump on their own.
+  - Append `!` (e.g. `feat!:`) or include `BREAKING CHANGE:` in the body to signal a MAJOR bump.
+  - Optional scope is allowed: `feat(pipelines): …`, `fix(auth): …`.
+- The single source of truth for the app version is the `version` field in [package.json](package.json). Bump it in the same commit as the release (or in a dedicated `chore(release): vX.Y.Z` commit), and tag the release with `vX.Y.Z`.
+- **Current version: `0.0.0`** (baseline as of 2026-04-15). The first public release should bump to `0.1.0` (feat-only) or `1.0.0` (once the API contract is considered stable).
+
+## Committing Guidelines
+
+Before **every** commit, Claude must:
+
+1. **Analyze the staged diff** and classify the change using Conventional Commits. Determine the implied next SemVer (MAJOR / MINOR / PATCH / none).
+2. **Always ask the user**:
+   > "Should I also create a new GitHub release for these changes? [Recommended] / [Not Recommended] — based on SemVer."
+   Include a one-line reason explaining the recommendation, for example:
+   - *"This contains a new feature (`feat:`) → MINOR bump recommended (0.0.0 → 0.1.0)."*
+   - *"This contains only a `fix:` → PATCH bump recommended (0.1.0 → 0.1.1)."*
+   - *"This is `chore:` / `docs:` only — no release recommended."*
+   - *"This commit contains a `BREAKING CHANGE` → MAJOR bump recommended (0.x.y → 1.0.0)."*
+3. If the user agrees:
+   - Bump `version` in [package.json](package.json) to the proposed value.
+   - Commit the bump with `chore(release): vX.Y.Z` (or fold the bump into the feature/fix commit — ask the user which style they prefer on the first release).
+   - Use the `gh` CLI to create the tag and release:
+     - `git tag -a vX.Y.Z -m "vX.Y.Z"`
+     - `git push origin vX.Y.Z`
+     - `gh release create vX.Y.Z --generate-notes --title "vX.Y.Z"`
+   - Confirm the release URL back to the user.
+4. If the user declines the release, commit normally without bumping `version`.

@@ -28,8 +28,11 @@ export interface Pipeline {
   steps: PipelineStep[];
   userId: string;
   isShared: boolean;
+  description?: string | null;
   createdAt: string;
 }
+
+export const PIPELINE_DESCRIPTION_MAX = 500;
 
 export type WorkflowStatus = 'ingest' | 'configure' | 'preview' | 'processing' | 'completed';
 
@@ -40,6 +43,7 @@ export interface Workflow {
   userId: string;
   pipelineId?: string;
   pipeline?: Pipeline;
+  steps?: PipelineStep[] | null;
   createdAt: string;
 }
 

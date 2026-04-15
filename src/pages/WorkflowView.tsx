@@ -106,7 +106,7 @@ export function WorkflowView() {
   const currentStageIndex = STAGES.findIndex(s => s.id === (workflow.status === 'completed' ? 'processing' : workflow.status));
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="bg-slate-50 flex flex-col">
       <div className="h-14 bg-white border-b border-slate-200 px-8 flex items-center justify-between shadow-sm sticky top-16 z-40">
         <div className="flex items-center gap-4">
           <Link to="/">
@@ -154,7 +154,7 @@ export function WorkflowView() {
               Next: Configure
             </Button>
           )}
-          {workflow.status === 'configure' && workflow.pipelineId && (
+          {workflow.status === 'configure' && (workflow.pipelineId || (workflow.steps && workflow.steps.length > 0)) && (
             <Button onClick={() => updateStatus('preview')} className="bg-primary hover:bg-primary/90 text-white font-bold uppercase tracking-wider text-xs px-6">
               Next: Preview
             </Button>
@@ -175,7 +175,7 @@ export function WorkflowView() {
       <main className="flex-1 p-8 overflow-auto">
         <div className="max-w-7xl mx-auto">
           {workflow.status === 'ingest' && <IngestStage workflowId={workflow.id} images={images} onRefresh={fetchWorkflow} />}
-          {workflow.status === 'configure' && <ConfigureStage workflowId={workflow.id} onRefresh={fetchWorkflow} currentPipelineId={workflow.pipelineId} />}
+          {workflow.status === 'configure' && <ConfigureStage workflowId={workflow.id} onRefresh={fetchWorkflow} currentPipelineId={workflow.pipelineId} currentInlineSteps={workflow.steps ?? null} />}
           {workflow.status === 'preview' && <PreviewStage workflowId={workflow.id} images={images} onRefresh={fetchWorkflow} />}
           {(workflow.status === 'processing' || workflow.status === 'completed') && <OutputStage workflow={workflow} images={images} onRefresh={fetchWorkflow} />}
         </div>
