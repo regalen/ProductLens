@@ -7,6 +7,7 @@ import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
 import pLimit from "p-limit";
 import sizeOf from "image-size";
+import sharp from "sharp";
 import db from "../../db.js";
 import { UPLOAD_DIR } from "../config.js";
 import { authenticate } from "../middleware/auth.js";
@@ -51,14 +52,23 @@ router.post(
 
     const files = req.files as any[];
     const stmt = db.prepare(
-      "INSERT INTO images (id, workflow_id, local_path, status, selected) VALUES (?, ?, ?, 'completed', 1)"
+      "INSERT INTO images (id, workflow_id, local_path, width, height, status, selected) VALUES (?, ?, ?, ?, ?, 'completed', 1)"
     );
     for (const file of files) {
       const id = uuidv4();
       const ext = path.extname(file.originalname) || ".jpg";
       const newPath = `${file.path}${ext}`;
       fs.renameSync(file.path, newPath);
-      stmt.run(id, workflowId, newPath);
+      let width: number | null = null;
+      let height: number | null = null;
+      try {
+        const meta = await sharp(newPath).metadata();
+        width = meta.width ?? null;
+        height = meta.height ?? null;
+      } catch (e) {
+        console.warn(`Failed to read dimensions for ${newPath}:`, e);
+      }
+      stmt.run(id, workflowId, newPath, width, height);
     }
     res.json({ success: true });
   }
@@ -93,7 +103,7 @@ router.post("/workflows/:id/urls", authenticate, async (req, res) => {
 
   const limit = pLimit(3);
   const stmt = db.prepare(
-    "INSERT INTO images (id, workflow_id, original_url, local_path, status, selected) VALUES (?, ?, ?, ?, 'completed', 1)"
+    "INSERT INTO images (id, workflow_id, original_url, local_path, width, height, status, selected) VALUES (?, ?, ?, ?, ?, ?, 'completed', 1)"
   );
 
   const tasks = urls.map((url: string) =>
@@ -125,7 +135,16 @@ router.post("/workflows/:id/urls", authenticate, async (req, res) => {
           writer.on("finish", () => resolve());
           writer.on("error", reject);
         });
-        stmt.run(id, workflowId, url, localPath);
+        let width: number | null = null;
+        let height: number | null = null;
+        try {
+          const meta = await sharp(localPath).metadata();
+          width = meta.width ?? null;
+          height = meta.height ?? null;
+        } catch (e) {
+          console.warn(`Failed to read dimensions for ${localPath}:`, e);
+        }
+        stmt.run(id, workflowId, url, localPath, width, height);
       } catch (e: any) {
         db.prepare(
           "INSERT INTO images (id, workflow_id, original_url, status, error_message, selected) VALUES (?, ?, ?, 'failed', ?, 0)"

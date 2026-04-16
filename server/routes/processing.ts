@@ -81,7 +81,7 @@ export async function processImage(
               size -
               encodedInfo.height -
               Math.floor((size - encodedInfo.height) / 2),
-            background: sampledBackground,
+            background: { r: 255, g: 255, b: 255, alpha: 1 },
           })
           .flatten({ background: { r: 255, g: 255, b: 255 } });
         break;
@@ -237,11 +237,11 @@ router.post("/workflows/:id/preview", authenticate, async (req, res) => {
         const previewPath = path.join(previewDir, `${img.id}.webp`);
         const tempPath = path.join(WORKSPACE_DIR, `${img.id}-preview.webp`);
         try {
-          await processImage(img.local_path, tempPath, steps, true);
+          const meta = await processImage(img.local_path, tempPath, steps, true);
           moveFile(tempPath, previewPath);
           db.prepare(
-            "UPDATE images SET preview_path = ?, status = 'completed' WHERE id = ?"
-          ).run(previewPath, img.id);
+            "UPDATE images SET preview_path = ?, preview_width = ?, preview_height = ?, status = 'completed' WHERE id = ?"
+          ).run(previewPath, meta.width ?? null, meta.height ?? null, img.id);
         } catch (e: any) {
           console.error(`Preview failed for ${img.id}:`, e);
           db.prepare(
@@ -312,6 +312,7 @@ router.post("/workflows/:id/process", authenticate, async (req, res) => {
   res.status(202).json({ success: true });
 
   const limit = pLimit(5);
+  let successCount = 0;
   await Promise.all(
     images.map((img: any, index: number) =>
       limit(async () => {
@@ -343,6 +344,7 @@ router.post("/workflows/:id/process", authenticate, async (req, res) => {
             fs.statSync(processedPath).size,
             img.id
           );
+          successCount++;
         } catch (e: any) {
           console.error(`Processing failed for ${img.id}:`, e);
           db.prepare(
@@ -352,6 +354,11 @@ router.post("/workflows/:id/process", authenticate, async (req, res) => {
       })
     )
   );
+  if (successCount > 0) {
+    db.prepare(
+      "UPDATE users SET images_processed_total = images_processed_total + ? WHERE id = ?"
+    ).run(successCount, req.user!.id);
+  }
   db.prepare("UPDATE workflows SET status = 'completed' WHERE id = ?").run(
     workflowId
   );

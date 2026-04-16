@@ -15,7 +15,10 @@ import {
   User as UserIcon,
   Settings2,
   Save,
-  X
+  X,
+  Clock,
+  Folder,
+  Image as ImageIcon
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
@@ -122,6 +125,23 @@ export function UserManagement() {
     }
   };
 
+  const formatLastLogin = (iso?: string | null): string => {
+    if (!iso) return 'Never';
+    // SQLite CURRENT_TIMESTAMP returns naive UTC ("YYYY-MM-DD HH:MM:SS"); tag as UTC so JS parses correctly.
+    const utc = iso.includes('T') ? iso : iso.replace(' ', 'T') + 'Z';
+    const d = new Date(utc);
+    if (isNaN(d.getTime())) return 'Unknown';
+    return d.toLocaleString('en-AU', {
+      timeZone: 'Australia/Sydney',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    }) + ' AEST';
+  };
+
   const getRoleIcon = (role: UserRole) => {
     switch (role) {
       case 'admin': return <Shield className="w-4 h-4 text-red-500" />;
@@ -187,6 +207,35 @@ export function UserManagement() {
                     Reset Required
                   </Badge>
                 )}
+              </div>
+
+              <div className="mt-3 flex items-center gap-2 text-slate-400">
+                <Clock className="w-3 h-3" />
+                <span className="text-[10px] font-bold uppercase tracking-widest">Last Login</span>
+                <span className="text-[10px] font-medium text-slate-500 ml-auto tabular-nums">
+                  {formatLastLogin(u.lastLoginAt)}
+                </span>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 pt-3 border-t border-slate-50">
+                <div className="flex items-center gap-2 text-slate-400">
+                  <Folder className="w-3 h-3" />
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-bold uppercase tracking-widest">Workflows</span>
+                    <span className="text-sm font-bold text-slate-700 tabular-nums">
+                      {(u.workflowsCreatedTotal ?? 0).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-slate-400">
+                  <ImageIcon className="w-3 h-3" />
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-bold uppercase tracking-widest">Images</span>
+                    <span className="text-sm font-bold text-slate-700 tabular-nums">
+                      {(u.imagesProcessedTotal ?? 0).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
               </div>
             </Card>
           ))}

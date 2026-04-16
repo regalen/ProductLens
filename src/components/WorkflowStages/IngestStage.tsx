@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,27 @@ export function IngestStage({ workflowId, images, onRefresh }: IngestStageProps)
   const [isProcessing, setIsProcessing] = useState(false);
   const [scrapedImages, setScrapedImages] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('upload');
+  const urlTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (activeTab === 'urls') urlTextareaRef.current?.focus();
+  }, [activeTab]);
+
+  const handleUrlPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pasted = e.clipboardData.getData('text').trim();
+    if (!pasted) return;
+    e.preventDefault();
+    const separator = urlList.length === 0 || urlList.endsWith('\n') ? '' : '\n';
+    const next = `${urlList}${separator}${pasted}\n`;
+    setUrlList(next);
+    requestAnimationFrame(() => {
+      const ta = urlTextareaRef.current;
+      if (!ta) return;
+      ta.selectionStart = ta.selectionEnd = next.length;
+      ta.scrollTop = ta.scrollHeight;
+    });
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -115,7 +136,7 @@ export function IngestStage({ workflowId, images, onRefresh }: IngestStageProps)
             <p className="text-xs text-slate-400 uppercase tracking-widest">Mix and match ingest methods</p>
           </div>
 
-          <Tabs defaultValue="upload" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3 bg-slate-50 p-1">
               <TabsTrigger value="upload" className="text-[10px] font-bold uppercase tracking-wider">Upload</TabsTrigger>
               <TabsTrigger value="urls" className="text-[10px] font-bold uppercase tracking-wider">URLs</TabsTrigger>
@@ -138,10 +159,12 @@ export function IngestStage({ workflowId, images, onRefresh }: IngestStageProps)
             </TabsContent>
 
             <TabsContent value="urls" className="mt-4 space-y-4">
-              <textarea 
+              <textarea
+                ref={urlTextareaRef}
                 value={urlList}
                 onChange={(e) => setUrlList(e.target.value)}
-                placeholder="Paste one URL per line..."
+                onPaste={handleUrlPaste}
+                placeholder="Paste URLs here — each paste auto-starts a new line"
                 className="w-full h-32 bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs focus:outline-none focus:border-primary transition-colors"
               />
               <Button onClick={handleUrlSubmit} disabled={isProcessing} className="w-full bg-primary hover:bg-primary/90 text-white font-bold uppercase tracking-wider text-xs h-10">
@@ -243,6 +266,11 @@ export function IngestStage({ workflowId, images, onRefresh }: IngestStageProps)
                        <Trash2 className="w-3 h-3" />
                      </Button>
                   </div>
+                  {img.status === 'completed' && img.width && img.height && (
+                    <div className="absolute bottom-2 left-2 z-20 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-md px-2 py-0.5 text-[10px] font-bold text-slate-600 shadow-sm tabular-nums">
+                      {img.width} &times; {img.height}
+                    </div>
+                  )}
                 </Card>
               ))}
               {images.length === 0 && (

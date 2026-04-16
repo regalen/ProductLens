@@ -10,10 +10,12 @@ const router = Router();
 router.get("/users", authenticate, requireRole(["admin"]), (req, res) => {
   const users = db
     .prepare(
-      "SELECT id, username, display_name as displayName, role, must_change_password as mustChangePassword FROM users ORDER BY created_at DESC"
+      "SELECT id, username, display_name as displayName, role, must_change_password as mustChangePassword, last_login_at as lastLoginAt, workflows_created_total as workflowsCreatedTotal, images_processed_total as imagesProcessedTotal FROM users ORDER BY created_at DESC"
     )
-    .all();
-  res.json(users);
+    .all() as Array<{ mustChangePassword: number } & Record<string, unknown>>;
+  res.json(
+    users.map((u) => ({ ...u, mustChangePassword: !!u.mustChangePassword }))
+  );
 });
 
 router.post(

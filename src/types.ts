@@ -20,6 +20,9 @@ export interface User {
   displayName: string;
   role: UserRole;
   mustChangePassword?: boolean;
+  lastLoginAt?: string | null;
+  workflowsCreatedTotal?: number;
+  imagesProcessedTotal?: number;
 }
 
 export interface Pipeline {
@@ -58,6 +61,8 @@ export interface WorkflowImage {
   type?: string;
   width?: number;
   height?: number;
+  previewWidth?: number;
+  previewHeight?: number;
   size?: number;
   selected: boolean;
   errorMessage?: string;

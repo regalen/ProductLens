@@ -52,12 +52,14 @@ server/
 - `db.ts` (project root) initializes SQLite via `better-sqlite3` at `data/database.sqlite`. Schema with migration guards. Seeds default admin (admin/admin). Indexes on foreign keys.
 - All workflow-scoped routes enforce ownership (`WHERE user_id = ?`).
 - Image uploads restricted to image MIME types, 50MB max per file.
-- Image processing uses Sharp. Key operations: "Resize Canvas" squares with sampled background; "Crop Content" uses `.trim()` or manual extraction.
+- Image processing uses Sharp. Key operations: "Resize Canvas" squares with pure-white padding via `.extend()`; "Crop Content" uses `.trim()` with the sampled (top-left pixel) background, or manual extraction.
+- Image dimensions are captured server-side at three points: on ingest (`images.width` / `images.height`, via `sharp().metadata()` after download/upload); on preview generation (`images.preview_width` / `images.preview_height`); on final processing, `width`/`height` are overwritten with the processed output's dimensions. Displayed on IngestStage and PreviewStage cards.
 - Web scraping uses Axios + Cheerio with multi-agent retry strategy. SSRF protection blocks private IPs.
 - Bulk Rename uses workflow name as prefix with iterating index (e.g., `Workflow_Name-1.jpg`).
 - Processed files stored in `data/processed/{workflowId}/{filename}` subdirectories to prevent collisions.
 - Public image URLs: `/images/{workflowId}/{filename}` — no auth, used in XLSX exports and "Copy Asset URL".
 - Exports: JSZip for ZIP, ExcelJS for XLSX (uses `BASE_URL` for public image links).
+- User activity tracking on the `users` table: `last_login_at` (UTC timestamp written by `POST /auth/login`; frontend displays in `Australia/Sydney` zone with an `AEST` label); lifetime counters `workflows_created_total` (incremented on workflow create) and `images_processed_total` (incremented once per batch after `Promise.all` in the `/process` route, not per image). These counters are **not** decremented by the 7-day purge — that's the point. Surfaced on the admin `/users` cards and in a hover tooltip over the header username.
 
 ## Docker
 
@@ -126,7 +128,7 @@ Strict mode is enabled (`strict: true`, `noUncheckedIndexedAccess: true`). DB ro
   - Append `!` (e.g. `feat!:`) or include `BREAKING CHANGE:` in the body to signal a MAJOR bump.
   - Optional scope is allowed: `feat(pipelines): …`, `fix(auth): …`.
 - The single source of truth for the app version is the `version` field in [package.json](package.json). Bump it in the same commit as the release (or in a dedicated `chore(release): vX.Y.Z` commit), and tag the release with `vX.Y.Z`.
-- **Current version: `0.0.0`** (baseline as of 2026-04-15). The first public release should bump to `0.1.0` (feat-only) or `1.0.0` (once the API contract is considered stable).
+- **Current version: `0.1.0`** (first public release, 2026-04-15). The next `feat:`-only batch → `0.2.0`; a `fix:`-only batch → `0.1.1`; `1.0.0` is reserved for when the API contract is considered stable.
 
 ## Committing Guidelines
 

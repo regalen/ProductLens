@@ -245,9 +245,9 @@ export function OutputStage({ workflow, images, onRefresh }: OutputStageProps) {
                           <SelectTrigger className="h-10 bg-slate-50 border-slate-200 text-xs font-bold text-slate-700">
                             <SelectValue placeholder="Assign Type..." />
                           </SelectTrigger>
-                          <SelectContent className="max-h-60">
+                          <SelectContent alignItemWithTrigger={false} className="max-h-60 w-auto min-w-[18rem]">
                             {IMAGE_TYPES.map((type) => (
-                              <SelectItem key={type} value={type} className="text-xs font-bold uppercase tracking-wider">
+                              <SelectItem key={type} value={type} className="text-xs font-bold uppercase tracking-wider pl-3 pr-10">
                                 {type}
                               </SelectItem>
                             ))}

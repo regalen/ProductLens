@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Plus, Folder, Clock, ChevronRight, Layout, LogOut, Loader2, AlertCircle, Trash2, Edit2, Save, Users } from 'lucide-react';
+import { Plus, Folder, Clock, ChevronRight, ChevronLeft, Layout, LogOut, Loader2, AlertCircle, Trash2, Edit2, Save, Users } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Workflow } from '../types';
@@ -17,15 +17,25 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+const PAGE_SIZE = 12;
+
 export function Dashboard() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [newWorkflowName, setNewWorkflowName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+  const [page, setPage] = useState(1);
+
   const [renamingWorkflow, setRenamingWorkflow] = useState<{ id: string, name: string } | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [isRenaming, setIsRenaming] = useState(false);
+
+  const totalPages = Math.max(1, Math.ceil(workflows.length / PAGE_SIZE));
+  const pagedWorkflows = workflows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -155,7 +165,7 @@ export function Dashboard() {
         </Card>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {workflows.map((wf) => (
+          {pagedWorkflows.map((wf) => (
             <Link key={wf.id} to={`/workflow/${wf.id}`}>
               <Card className="group p-5 bg-white border-slate-200 hover:border-primary/50 hover:shadow-md transition-all cursor-pointer relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-1 h-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -207,6 +217,36 @@ export function Dashboard() {
             </div>
           )}
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              Page {page} of {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="border-slate-200 bg-white text-slate-600 font-bold text-xs uppercase tracking-wider"
+              >
+                <ChevronLeft className="w-3.5 h-3.5 mr-1" />
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="border-slate-200 bg-white text-slate-600 font-bold text-xs uppercase tracking-wider"
+              >
+                Next
+                <ChevronRight className="w-3.5 h-3.5 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
       </main>
 
       <Dialog open={!!renamingWorkflow} onOpenChange={(open) => !open && setRenamingWorkflow(null)}>

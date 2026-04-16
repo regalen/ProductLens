@@ -100,6 +100,21 @@ db.exec(`
 if (!columnExists('workflows', 'steps')) {
   db.exec("ALTER TABLE workflows ADD COLUMN steps TEXT");
 }
+if (!columnExists('images', 'preview_width')) {
+  db.exec("ALTER TABLE images ADD COLUMN preview_width INTEGER");
+}
+if (!columnExists('images', 'preview_height')) {
+  db.exec("ALTER TABLE images ADD COLUMN preview_height INTEGER");
+}
+if (!columnExists('users', 'last_login_at')) {
+  db.exec("ALTER TABLE users ADD COLUMN last_login_at DATETIME");
+}
+if (!columnExists('users', 'workflows_created_total')) {
+  db.exec("ALTER TABLE users ADD COLUMN workflows_created_total INTEGER NOT NULL DEFAULT 0");
+}
+if (!columnExists('users', 'images_processed_total')) {
+  db.exec("ALTER TABLE users ADD COLUMN images_processed_total INTEGER NOT NULL DEFAULT 0");
+}
 
 // Indexes for common query patterns
 db.exec(`

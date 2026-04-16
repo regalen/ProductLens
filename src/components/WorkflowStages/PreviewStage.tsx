@@ -129,10 +129,21 @@ export function PreviewStage({ workflowId, images, onRefresh }: PreviewStageProp
                 )}
               </div>
 
+              {img.previewPath && img.previewWidth && img.previewHeight && (
+                <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-md px-2 py-0.5 text-[10px] font-bold text-slate-600 shadow-sm tabular-nums group-hover:opacity-0 transition-opacity">
+                  {img.previewWidth} &times; {img.previewHeight}
+                </div>
+              )}
+
               <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm p-3 border-t border-slate-100 transform translate-y-full group-hover:translate-y-0 transition-transform">
                 <p className="text-[10px] font-bold text-slate-600 uppercase truncate">
                   {img.originalUrl ? new URL(img.originalUrl).pathname.split('/').pop() : 'Uploaded Image'}
                 </p>
+                {img.previewWidth && img.previewHeight && (
+                  <p className="text-[10px] font-medium text-slate-500 tabular-nums mt-0.5">
+                    {img.previewWidth} &times; {img.previewHeight} px
+                  </p>
+                )}
               </div>
             </Card>
           </motion.div>

@@ -16,6 +16,7 @@ router.post("/login", async (req, res) => {
   if (!user || !(await bcrypt.compare(password, user.password_hash))) {
     return res.status(401).json({ error: "Invalid credentials" });
   }
+  db.prepare("UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?").run(user.id);
   const token = jwt.sign({ id: user.id }, JWT_SECRET);
   res.cookie("token", token, {
     httpOnly: true,
@@ -29,6 +30,8 @@ router.post("/login", async (req, res) => {
     displayName: user.display_name,
     role: user.role,
     mustChangePassword: !!user.must_change_password,
+    workflowsCreatedTotal: user.workflows_created_total,
+    imagesProcessedTotal: user.images_processed_total,
   });
 });
 
@@ -46,7 +49,12 @@ router.post("/change-password", authenticate, async (req, res) => {
 });
 
 router.get("/me", authenticate, (req, res) => {
-  res.json(req.user);
+  const totals = db
+    .prepare(
+      "SELECT workflows_created_total as workflowsCreatedTotal, images_processed_total as imagesProcessedTotal FROM users WHERE id = ?"
+    )
+    .get(req.user!.id);
+  res.json({ ...req.user, ...(totals as object) });
 });
 
 router.post("/logout", (req, res) => {

@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Layout as LayoutIcon, LogOut, Users, Image as ImageIcon, BarChart3, Puzzle, Network } from "lucide-react";
+import { Layout as LayoutIcon, LogOut, Users, Image as ImageIcon, BarChart3, Puzzle, Network, Folder } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
 import { Footer } from "./Footer";
@@ -103,10 +103,39 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <div className="h-8 w-px bg-slate-100 mx-2" />
 
           <div className="flex items-center gap-4">
-            <div className="text-right hidden sm:block">
-              <p className="text-xs font-bold text-slate-900 leading-none">{user?.displayName}</p>
-              <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1">@{user?.username}</p>
-            </div>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <div className="text-right hidden sm:block cursor-default">
+                    <p className="text-xs font-bold text-slate-900 leading-none">{user?.displayName}</p>
+                    <p className="text-[10px] text-slate-400 tracking-widest font-bold mt-1">@{user?.username}</p>
+                  </div>
+                }
+              />
+              <TooltipContent side="bottom" className="px-4 py-3">
+                <div className="flex flex-col gap-2 min-w-[180px]">
+                  <p className="text-[9px] font-bold uppercase tracking-widest opacity-60">Lifetime Activity</p>
+                  <div className="flex items-center justify-between gap-6">
+                    <div className="flex items-center gap-2">
+                      <Folder className="w-3 h-3" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest">Workflows</span>
+                    </div>
+                    <span className="text-sm font-bold tabular-nums">
+                      {(user?.workflowsCreatedTotal ?? 0).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-6">
+                    <div className="flex items-center gap-2">
+                      <ImageIcon className="w-3 h-3" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest">Images</span>
+                    </div>
+                    <span className="text-sm font-bold tabular-nums">
+                      {(user?.imagesProcessedTotal ?? 0).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
             <Button variant="ghost" size="icon" onClick={logout} className="text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full">
               <LogOut className="w-5 h-5" />
             </Button>

@@ -28,6 +28,9 @@ router.post("/", authenticate, (req, res) => {
   db.prepare(
     "INSERT INTO workflows (id, name, status, user_id) VALUES (?, ?, 'ingest', ?)"
   ).run(id, name, req.user!.id);
+  db.prepare(
+    "UPDATE users SET workflows_created_total = workflows_created_total + 1 WHERE id = ?"
+  ).run(req.user!.id);
   res.json({ id, name, status: "ingest" });
 });
 
@@ -65,7 +68,7 @@ router.get("/:id", authenticate, (req, res) => {
 
   const images = db
     .prepare(
-      "SELECT id, workflow_id as workflowId, original_url as originalUrl, local_path as localPath, preview_path as previewPath, processed_path as processedPath, status, type, width, height, size, selected, error_message as errorMessage, created_at as createdAt FROM images WHERE workflow_id = ? ORDER BY created_at ASC"
+      "SELECT id, workflow_id as workflowId, original_url as originalUrl, local_path as localPath, preview_path as previewPath, processed_path as processedPath, status, type, width, height, preview_width as previewWidth, preview_height as previewHeight, size, selected, error_message as errorMessage, created_at as createdAt FROM images WHERE workflow_id = ? ORDER BY created_at ASC"
     )
     .all(req.params.id);
   res.json({ ...workflow, pipeline, images });

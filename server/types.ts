@@ -6,6 +6,9 @@ export interface UserRow {
   role: string;
   must_change_password: number;
   created_at: string;
+  last_login_at: string | null;
+  workflows_created_total: number;
+  images_processed_total: number;
 }
 
 export interface WorkflowRow {
@@ -29,6 +32,8 @@ export interface ImageRow {
   type: string | null;
   width: number | null;
   height: number | null;
+  preview_width: number | null;
+  preview_height: number | null;
   size: number | null;
   selected: number;
   error_message: string | null;

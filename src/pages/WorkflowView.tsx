@@ -128,11 +128,17 @@ export function WorkflowView() {
             const isPast = idx < currentStageIndex;
             return (
               <React.Fragment key={stage.id}>
-                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all ${isActive ? 'bg-primary text-white shadow-md shadow-blue-900/10' : isPast ? 'text-primary' : 'text-slate-300'}`}>
+                <button
+                  type="button"
+                  onClick={() => { if (isPast) updateStatus(stage.id); }}
+                  disabled={!isPast}
+                  aria-current={isActive ? 'step' : undefined}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all ${isActive ? 'bg-primary text-white shadow-md shadow-blue-900/10 cursor-default' : isPast ? 'text-primary hover:bg-primary/10 cursor-pointer' : 'text-slate-300 cursor-not-allowed'}`}
+                >
                   <Icon className="w-3.5 h-3.5" />
                   <span className="text-[10px] font-bold uppercase tracking-wider">{stage.label}</span>
                   {isPast && <CheckCircle2 className="w-3 h-3" />}
-                </div>
+                </button>
                 {idx < STAGES.length - 1 && <ChevronRight className="w-3 h-3 text-slate-200" />}
               </React.Fragment>
             );
