@@ -3,17 +3,21 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Download, 
-  FileSpreadsheet, 
-  Archive, 
-  ExternalLink, 
-  CheckCircle2, 
-  Loader2, 
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  Download,
+  FileSpreadsheet,
+  Archive,
+  ExternalLink,
+  CheckCircle2,
+  Loader2,
   AlertCircle,
   Play,
   RefreshCw,
-  Share2
+  Share2,
+  X,
+  MinusCircle,
+  Trash2
 } from 'lucide-react';
 import axios from 'axios';
 import { WorkflowImage, IMAGE_TYPES, Workflow } from '../../types';
@@ -49,11 +53,40 @@ export function OutputStage({ workflow, images, onRefresh }: OutputStageProps) {
     onRefresh();
   };
 
+  const clearType = async (imageId: string) => {
+    await axios.patch(`/api/images/${imageId}`, { type: null });
+    onRefresh();
+  };
+
+  const deselectImage = async (imageId: string) => {
+    await axios.patch(`/api/images/${imageId}`, { selected: false });
+    onRefresh();
+  };
+
+  const handleRemoveImage = async (imageId: string) => {
+    try {
+      await axios.delete(`/api/images/${imageId}`);
+      onRefresh();
+    } catch (err: any) {
+      console.error('Failed to remove image:', err);
+    }
+  };
+
   const selectedImages = images.filter(img => img.selected);
   const completedCount = selectedImages.filter(img => img.processedPath).length;
   const processingCount = selectedImages.filter(img => img.status === 'processing').length;
   const isAllDone = completedCount === selectedImages.length && selectedImages.length > 0;
-  const allTypesAssigned = selectedImages.every(img => img.type);
+  const labeledCount = selectedImages.filter(img => img.type).length;
+  const allTypesAssigned = labeledCount === selectedImages.length && selectedImages.length > 0;
+  const isPartiallyLabeled = labeledCount > 0 && labeledCount < selectedImages.length;
+  const takenTypes = new Set(selectedImages.map(img => img.type).filter(Boolean) as string[]);
+
+  const clearAllTypes = async () => {
+    const toClear = selectedImages.filter(img => img.type);
+    if (toClear.length === 0) return;
+    await Promise.all(toClear.map(img => axios.patch(`/api/images/${img.id}`, { type: null })));
+    onRefresh();
+  };
   
   const progress = selectedImages.length > 0 ? (completedCount / selectedImages.length) * 100 : 0;
   const isActuallyProcessing = isProcessing || processingCount > 0;
@@ -99,9 +132,19 @@ export function OutputStage({ workflow, images, onRefresh }: OutputStageProps) {
           </div>
         </div>
         <div className="flex gap-3">
+          {labeledCount > 0 && (
+            <Button
+              variant="ghost"
+              onClick={clearAllTypes}
+              className="text-red-400 hover:text-red-500 hover:bg-red-50 font-bold uppercase tracking-wider text-[10px] h-11 px-4"
+            >
+              <X className="w-3 h-3 mr-2" />
+              Clear Labels
+            </Button>
+          )}
           {!isAllDone && (
-            <Button 
-              onClick={startFullProcess} 
+            <Button
+              onClick={startFullProcess}
               disabled={isActuallyProcessing || selectedImages.length === 0}
               className="bg-primary hover:bg-primary/90 text-white font-bold uppercase tracking-wider text-xs px-8 h-11 shadow-lg shadow-blue-900/10 relative overflow-hidden"
             >
@@ -147,6 +190,15 @@ export function OutputStage({ workflow, images, onRefresh }: OutputStageProps) {
           )}
         </div>
       </div>
+
+      {isPartiallyLabeled && (
+        <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex items-center gap-3 text-red-600">
+          <AlertCircle className="w-5 h-5" />
+          <p className="text-xs font-bold uppercase tracking-wider">
+            Assign a label to every image, or clear all labels.
+          </p>
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex items-center gap-3 text-red-600">
@@ -207,10 +259,10 @@ export function OutputStage({ workflow, images, onRefresh }: OutputStageProps) {
           return (
             <Card key={img.id} className="p-6 bg-white border-slate-200 shadow-sm">
               <div className="flex flex-col md:flex-row gap-8">
-                <div className="w-full md:w-80 h-80 bg-slate-50 rounded-xl border border-slate-100 overflow-hidden relative flex items-center justify-center shrink-0">
+                <div className="group w-full md:w-80 h-80 bg-slate-50 rounded-xl border border-slate-100 overflow-hidden relative flex items-center justify-center shrink-0">
                   {(img.processedPath || img.previewPath || img.localPath) ? (
-                    <img 
-                      src={img.processedPath ? `/api/assets/${img.id}` : img.previewPath ? `/api/previews/${img.id}` : `/api/assets/${img.id}`} 
+                    <img
+                      src={img.processedPath ? `/api/assets/${img.id}` : img.previewPath ? `/api/previews/${img.id}` : `/api/assets/${img.id}`}
                       className="w-full h-full object-contain p-4"
                       alt="Asset"
                     />
@@ -223,6 +275,30 @@ export function OutputStage({ workflow, images, onRefresh }: OutputStageProps) {
                   {img.processedPath && (
                     <div className="absolute top-2 right-2 bg-emerald-500 text-white rounded-full p-1 shadow-sm">
                       <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                  )}
+                  {workflow.status !== 'completed' && (
+                    <div className="absolute top-2 left-2 flex gap-1.5">
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-8 w-8 bg-white/90 backdrop-blur-sm border border-slate-200 text-slate-400 hover:text-amber-500 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => deselectImage(img.id)}
+                        aria-label="Remove from batch"
+                        title="Remove from batch"
+                      >
+                        <MinusCircle className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-8 w-8 bg-white/90 backdrop-blur-sm border border-slate-200 text-slate-400 hover:text-red-500 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => handleRemoveImage(img.id)}
+                        aria-label="Delete image"
+                        title="Delete image"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -238,21 +314,39 @@ export function OutputStage({ workflow, images, onRefresh }: OutputStageProps) {
                       </div>
                       <div className="w-full md:w-64 space-y-1">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Image Type Label</p>
-                        <Select 
-                          value={img.type || ""} 
-                          onValueChange={(val) => { if (val) handleTypeChange(img.id, val); }}
-                        >
-                          <SelectTrigger className="h-10 bg-slate-50 border-slate-200 text-xs font-bold text-slate-700">
-                            <SelectValue placeholder="Assign Type..." />
-                          </SelectTrigger>
-                          <SelectContent alignItemWithTrigger={false} className="max-h-60 w-auto min-w-[18rem]">
-                            {IMAGE_TYPES.map((type) => (
-                              <SelectItem key={type} value={type} className="text-xs font-bold uppercase tracking-wider pl-3 pr-10">
-                                {type}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={img.type || ""}
+                            onValueChange={(val) => { if (val) handleTypeChange(img.id, val); }}
+                          >
+                            <SelectTrigger className="h-10 bg-slate-50 border-slate-200 text-xs font-bold text-slate-700 flex-1 min-w-0">
+                              <SelectValue placeholder="Assign Type..." />
+                            </SelectTrigger>
+                            <SelectContent alignItemWithTrigger={false} className="max-h-60 w-auto min-w-[18rem]">
+                              {IMAGE_TYPES.map((type) => (
+                                <SelectItem
+                                  key={type}
+                                  value={type}
+                                  disabled={takenTypes.has(type) && img.type !== type}
+                                  className="text-xs font-bold uppercase tracking-wider pl-3 pr-10"
+                                >
+                                  {type}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {img.type && (
+                            <button
+                              type="button"
+                              onClick={() => clearType(img.id)}
+                              aria-label="Clear label"
+                              title="Clear label"
+                              className="h-10 w-8 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors shrink-0"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -306,21 +400,35 @@ export function OutputStage({ workflow, images, onRefresh }: OutputStageProps) {
                        <ExternalLink className="w-3.5 h-3.5 mr-2" />
                        View Full Image
                      </Button>
-                     <Button 
-                       variant="outline" 
-                       size="sm" 
-                       className="h-9 text-[10px] font-bold uppercase tracking-widest border-slate-200 text-slate-600 hover:bg-slate-50 px-4"
-                       onClick={() => {
-                         const filename = img.processedPath?.split('/').pop();
-                         const url = filename
-                           ? `${window.location.origin}/images/${img.workflowId}/${filename}`
-                           : `${window.location.origin}/api/assets/${img.id}`;
-                         navigator.clipboard.writeText(url);
-                       }}
-                     >
-                       <Share2 className="w-3.5 h-3.5 mr-2" />
-                       Copy Asset URL
-                     </Button>
+                     {img.processedPath ? (
+                       <Button
+                         variant="outline"
+                         size="sm"
+                         className="h-9 text-[10px] font-bold uppercase tracking-widest border-slate-200 text-slate-600 hover:bg-slate-50 px-4"
+                         onClick={() => {
+                           const filename = img.processedPath?.split('/').pop();
+                           navigator.clipboard.writeText(`${window.location.origin}/images/${img.workflowId}/${filename}`);
+                         }}
+                       >
+                         <Share2 className="w-3.5 h-3.5 mr-2" />
+                         Copy Asset URL
+                       </Button>
+                     ) : (
+                       <Tooltip>
+                         <TooltipTrigger render={<span className="inline-block" />}>
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             disabled
+                             className="h-9 text-[10px] font-bold uppercase tracking-widest border-slate-200 text-slate-600 hover:bg-slate-50 px-4"
+                           >
+                             <Share2 className="w-3.5 h-3.5 mr-2" />
+                             Copy Asset URL
+                           </Button>
+                         </TooltipTrigger>
+                         <TooltipContent>Available after processing completes</TooltipContent>
+                       </Tooltip>
+                     )}
                   </div>
                 </div>
               </div>

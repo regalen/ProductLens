@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Upload, Link as LinkIcon, Search, Loader2, Trash2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import axios from 'axios';
 import { WorkflowImage } from '../../types';
-import { ScraperResults } from '../ScraperResults';
+import { ScraperResults, type ScrapedImage } from '../ScraperResults';
 
 interface IngestStageProps {
   workflowId: string;
@@ -18,7 +18,7 @@ export function IngestStage({ workflowId, images, onRefresh }: IngestStageProps)
   const [urlList, setUrlList] = useState('');
   const [scrapeUrl, setScrapeUrl] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [scrapedImages, setScrapedImages] = useState<any[] | null>(null);
+  const [scrapedImages, setScrapedImages] = useState<ScrapedImage[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('upload');
   const urlTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -203,9 +203,9 @@ export function IngestStage({ workflowId, images, onRefresh }: IngestStageProps)
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => setScrapedImages(null)} className="text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600">Close Results</Button>
               </div>
-              <ScraperResults 
-                images={scrapedImages.map(img => img.url)} 
-                onSelect={handleSelectScraped} 
+              <ScraperResults
+                images={scrapedImages}
+                onSelect={handleSelectScraped}
                 addedUrls={images.map(img => img.originalUrl).filter(Boolean) as string[]}
               />
               <div className="h-px bg-slate-100" />

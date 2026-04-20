@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Play, CheckCircle2, XCircle, Eye, Info, Maximize2 } from 'lucide-react';
+import { Loader2, Play, CheckCircle2, XCircle, Eye, Info, Maximize2, Trash2 } from 'lucide-react';
 import axios from 'axios';
 import { WorkflowImage } from '../../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -39,6 +39,15 @@ export function PreviewStage({ workflowId, images, onRefresh }: PreviewStageProp
   const toggleSelection = async (id: string, current: boolean) => {
     await axios.patch(`/api/images/${id}`, { selected: !current });
     onRefresh();
+  };
+
+  const handleRemoveImage = async (id: string) => {
+    try {
+      await axios.delete(`/api/images/${id}`);
+      onRefresh();
+    } catch (err: any) {
+      console.error('Failed to remove image:', err);
+    }
   };
 
   const selectedCount = images.filter(img => img.selected).length;
@@ -117,6 +126,19 @@ export function PreviewStage({ workflowId, images, onRefresh }: PreviewStageProp
                   }}
                 >
                   <Maximize2 className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="h-8 w-8 bg-white/90 backdrop-blur-sm border border-slate-200 text-slate-400 hover:text-red-500 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveImage(img.id);
+                  }}
+                  aria-label="Delete image"
+                  title="Delete image"
+                >
+                  <Trash2 className="w-4 h-4" />
                 </Button>
                 {img.selected ? (
                   <div className="bg-primary text-white rounded-full p-1 shadow-sm">

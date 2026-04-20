@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Layout as LayoutIcon, LogOut, Users, Image as ImageIcon, BarChart3, Puzzle, Network, Folder } from "lucide-react";
+import { Layout as LayoutIcon, LogOut, Users, Image as ImageIcon, BarChart3, Puzzle, Network, Folder, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
 import { Footer } from "./Footer";
@@ -54,9 +54,19 @@ function NavItem({ label, icon, to, isActive, isComingSoon }: NavItemProps) {
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const location = useLocation();
   const isAdmin = user?.role === 'admin';
+  const lastActivityRefetch = React.useRef<number>(0);
+  const [isRefreshingActivity, setIsRefreshingActivity] = React.useState(false);
+
+  const handleActivityTooltipOpenChange = (open: boolean) => {
+    if (!open) return;
+    if (Date.now() - lastActivityRefetch.current < 30_000) return;
+    lastActivityRefetch.current = Date.now();
+    setIsRefreshingActivity(true);
+    refreshUser().finally(() => setIsRefreshingActivity(false));
+  };
 
   const navItems: NavItemProps[] = [
     { label: "Image Processing", icon: <ImageIcon className="w-4 h-4" />, to: "/", isActive: location.pathname === "/" || location.pathname.startsWith("/workflow") || location.pathname === "/pipelines" },
@@ -103,7 +113,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <div className="h-8 w-px bg-slate-100 mx-2" />
 
           <div className="flex items-center gap-4">
-            <Tooltip>
+            <Tooltip onOpenChange={handleActivityTooltipOpenChange}>
               <TooltipTrigger
                 render={
                   <div className="text-right hidden sm:block cursor-default">
@@ -114,7 +124,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
               />
               <TooltipContent side="bottom" className="px-4 py-3">
                 <div className="flex flex-col gap-2 min-w-[180px]">
-                  <p className="text-[9px] font-bold uppercase tracking-widest opacity-60">Lifetime Activity</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[9px] font-bold uppercase tracking-widest opacity-60">Lifetime Activity</p>
+                    {isRefreshingActivity && <Loader2 className="w-3 h-3 opacity-60 animate-spin" />}
+                  </div>
                   <div className="flex items-center justify-between gap-6">
                     <div className="flex items-center gap-2">
                       <Folder className="w-3 h-3" />

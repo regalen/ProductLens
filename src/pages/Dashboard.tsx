@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Plus, Folder, Clock, ChevronRight, ChevronLeft, Layout, LogOut, Loader2, AlertCircle, Trash2, Edit2, Save, Users } from 'lucide-react';
+import { Plus, Folder, Clock, ChevronRight, ChevronLeft, Layout, LogOut, Loader2, AlertCircle, Trash2, Edit2, Save, Users, Info } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Workflow } from '../types';
@@ -29,6 +29,7 @@ export function Dashboard() {
   const [renamingWorkflow, setRenamingWorkflow] = useState<{ id: string, name: string } | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [isRenaming, setIsRenaming] = useState(false);
+  const [purgeDays, setPurgeDays] = useState<number | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(workflows.length / PAGE_SIZE));
   const pagedWorkflows = workflows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -45,6 +46,9 @@ export function Dashboard() {
 
   useEffect(() => {
     fetchWorkflows();
+    axios.get('/api/config')
+      .then(res => setPurgeDays(res.data.purgeDays))
+      .catch(err => console.error('Failed to fetch config:', err));
   }, []);
 
   const fetchWorkflows = async () => {
@@ -133,6 +137,16 @@ export function Dashboard() {
             </Link>
           )}
         </div>
+
+        {purgeDays !== null && (
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
+            <Info className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-blue-700 leading-relaxed">
+              <span className="font-bold uppercase tracking-wider mr-2">Heads up:</span>
+              Workflows are automatically deleted {purgeDays} {purgeDays === 1 ? 'day' : 'days'} after creation.
+            </p>
+          </div>
+        )}
 
         <Card className="p-6 bg-white border-slate-200 shadow-sm space-y-4">
           <form onSubmit={handleCreateWorkflow} className="flex gap-4">
