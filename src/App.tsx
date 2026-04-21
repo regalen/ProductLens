@@ -7,6 +7,8 @@ import { PipelineManager } from "./pages/PipelineManager";
 import { WorkflowView } from "./pages/WorkflowView";
 import { UserManagement } from "./pages/UserManagement";
 import { ChangePassword } from "./pages/ChangePassword";
+import { Reporting } from "./pages/Reporting";
+import { ReportDetail } from "./pages/ReportDetail";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Loader2 } from "lucide-react";
 
@@ -76,13 +78,29 @@ export default function App() {
                 </ProtectedRoute>
               } 
             />
-            <Route 
-              path="/workflow/:id" 
+            <Route
+              path="/workflow/:id"
               element={
                 <ProtectedRoute>
                   <WorkflowView />
                 </ProtectedRoute>
-              } 
+              }
+            />
+            <Route
+              path="/reporting"
+              element={
+                <ProtectedRoute>
+                  <Reporting />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reporting/:reportType"
+              element={
+                <ProtectedRoute>
+                  <ReportDetail />
+                </ProtectedRoute>
+              }
             />
           </Routes>
         </Router>

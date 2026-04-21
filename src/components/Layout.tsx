@@ -70,7 +70,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const navItems: NavItemProps[] = [
     { label: "Image Processing", icon: <ImageIcon className="w-4 h-4" />, to: "/", isActive: location.pathname === "/" || location.pathname.startsWith("/workflow") || location.pathname === "/pipelines" },
-    { label: "Reporting", icon: <BarChart3 className="w-4 h-4" />, isComingSoon: true },
+    { label: "Reporting", icon: <BarChart3 className="w-4 h-4" />, to: "/reporting", isActive: location.pathname.startsWith("/reporting") },
     { label: "Add Ons", icon: <Puzzle className="w-4 h-4" />, isComingSoon: true },
     { label: "Taxonomy Mapping", icon: <Network className="w-4 h-4" />, isComingSoon: true },
   ];

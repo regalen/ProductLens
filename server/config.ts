@@ -19,4 +19,5 @@ export const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data")
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
 export const PREVIEW_DIR = path.join(DATA_DIR, "previews");
 export const PROCESSED_DIR = path.join(DATA_DIR, "processed");
+export const REPORTS_DIR = path.join(DATA_DIR, "reports");
 export const WORKSPACE_DIR = process.env.WORKSPACE_DIR || path.join(DATA_DIR, "workspace");

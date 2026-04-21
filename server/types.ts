@@ -49,3 +49,16 @@ export interface PipelineRow {
   description: string | null;
   created_at: string;
 }
+
+export interface ReportFileRow {
+  id: string;
+  report_type: string;
+  country: string;
+  slot: "current" | "previous";
+  original_filename: string;
+  original_path: string;
+  cleansed_path: string | null;
+  uploaded_by: string;
+  uploaded_at: string;
+  row_count: number | null;
+}

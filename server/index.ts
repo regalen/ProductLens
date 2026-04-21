@@ -6,7 +6,7 @@ import path from "path";
 import cookieParser from "cookie-parser";
 import fs from "fs";
 
-import { DATA_DIR, UPLOAD_DIR, PREVIEW_DIR, PROCESSED_DIR, WORKSPACE_DIR, PORT, CORS_ORIGIN } from "./config.js";
+import { DATA_DIR, UPLOAD_DIR, PREVIEW_DIR, PROCESSED_DIR, REPORTS_DIR, WORKSPACE_DIR, PORT, CORS_ORIGIN } from "./config.js";
 import authRouter from "./routes/auth.js";
 import adminRouter from "./routes/admin.js";
 import pipelinesRouter from "./routes/pipelines.js";
@@ -15,12 +15,13 @@ import ingestRouter from "./routes/ingest.js";
 import processingRouter from "./routes/processing.js";
 import imagesRouter, { publicImagesRouter } from "./routes/images.js";
 import exportRouter from "./routes/export.js";
+import reportsRouter from "./routes/reports.js";
 import configRouter from "./routes/config.js";
 import { purgeExpiredWorkflows } from "./utils/purge.js";
 import { looseLimiter } from "./middleware/rateLimit.js";
 
 // Ensure data directories exist
-for (const dir of [DATA_DIR, UPLOAD_DIR, PREVIEW_DIR, PROCESSED_DIR, WORKSPACE_DIR]) {
+for (const dir of [DATA_DIR, UPLOAD_DIR, PREVIEW_DIR, PROCESSED_DIR, REPORTS_DIR, WORKSPACE_DIR]) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
@@ -68,6 +69,8 @@ async function startServer() {
 
   // Export routes are mounted at /api (they include full paths like /workflows/:id/export/xlsx)
   app.use("/api", exportRouter);
+
+  app.use("/api/reports", reportsRouter);
 
   app.use("/api", configRouter);
 

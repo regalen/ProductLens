@@ -116,11 +116,29 @@ if (!columnExists('users', 'images_processed_total')) {
   db.exec("ALTER TABLE users ADD COLUMN images_processed_total INTEGER NOT NULL DEFAULT 0");
 }
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS report_files (
+    id TEXT PRIMARY KEY,
+    report_type TEXT NOT NULL,
+    country TEXT NOT NULL,
+    slot TEXT NOT NULL, -- 'current' | 'previous'
+    original_filename TEXT NOT NULL,
+    original_path TEXT NOT NULL,
+    cleansed_path TEXT,
+    uploaded_by TEXT NOT NULL,
+    uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    row_count INTEGER,
+    FOREIGN KEY (uploaded_by) REFERENCES users(id),
+    UNIQUE (report_type, country, slot)
+  );
+`);
+
 // Indexes for common query patterns
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_workflows_user_id ON workflows(user_id);
   CREATE INDEX IF NOT EXISTS idx_images_workflow_id ON images(workflow_id);
   CREATE INDEX IF NOT EXISTS idx_pipelines_user_id ON pipelines(user_id);
+  CREATE INDEX IF NOT EXISTS idx_report_files_lookup ON report_files (report_type, country, slot);
 `);
 
 // Seed default admin if it doesn't exist
