@@ -11,7 +11,8 @@ import sharp from "sharp";
 import db from "../../db.js";
 import { UPLOAD_DIR } from "../config.js";
 import { authenticate } from "../middleware/auth.js";
-import { isPrivateUrl } from "../utils/url.js";
+import { isPrivateUrl, safeAxiosGet } from "../utils/url.js";
+import { strictLimiter } from "../middleware/rateLimit.js";
 
 const ALLOWED_IMAGE_TYPES = [
   "image/jpeg",
@@ -121,7 +122,7 @@ router.post("/workflows/:id/urls", authenticate, async (req, res) => {
       const ext = path.extname(new URL(url).pathname) || ".jpg";
       const localPath = path.join(UPLOAD_DIR, `${id}${ext}`);
       try {
-        const response = await axios.get(url, {
+        const response = await safeAxiosGet(url, {
           responseType: "stream",
           timeout: 15000,
           headers: {
@@ -157,7 +158,7 @@ router.post("/workflows/:id/urls", authenticate, async (req, res) => {
   res.json({ success: true });
 });
 
-router.post("/scrape", authenticate, async (req, res) => {
+router.post("/scrape", strictLimiter, authenticate, async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: "URL is required" });
 
@@ -190,7 +191,7 @@ router.post("/scrape", authenticate, async (req, res) => {
       // Step 1: Try to get a session cookie from the home page or a common entry point
       let cookie = "";
       try {
-        const cookieResponse = await axios.get(`https://${domain}/`, {
+        const cookieResponse = await safeAxiosGet(`https://${domain}/`, {
           headers: {
             "User-Agent": agents[agentIndex],
             Accept:
@@ -212,7 +213,7 @@ router.post("/scrape", authenticate, async (req, res) => {
       }
 
       // Step 2: Perform the actual scrape with the acquired cookie
-      const response = await axios.get(targetUrl, {
+      const response = await safeAxiosGet(targetUrl, {
         headers: {
           "User-Agent": agents[agentIndex],
           Accept:

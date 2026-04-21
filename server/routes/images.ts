@@ -110,7 +110,15 @@ export default router;
 export const publicImagesRouter = Router();
 publicImagesRouter.get("/images/:workflowId/:filename", (req, res) => {
   const { workflowId, filename } = req.params;
-  const filePath = path.join(PROCESSED_DIR, workflowId, filename);
+
+  if (!/^[a-zA-Z0-9-]+$/.test(workflowId)) return res.status(400).send("Bad request");
+  const safeFilename = path.basename(filename);
+  if (safeFilename !== filename) return res.status(400).send("Bad request");
+
+  const baseDir = path.resolve(PROCESSED_DIR);
+  const filePath = path.resolve(baseDir, workflowId, safeFilename);
+  if (!filePath.startsWith(baseDir + path.sep)) return res.status(400).send("Bad request");
+
   if (!fs.existsSync(filePath)) return res.status(404).send("Not found");
-  res.sendFile(path.resolve(filePath));
+  res.sendFile(filePath);
 });

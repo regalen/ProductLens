@@ -1,3 +1,5 @@
+import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
+
 /**
  * SSRF protection — returns true if the URL resolves to a private/loopback address
  * that should not be reachable from the server.
@@ -62,4 +64,14 @@ export function isPrivateUrl(urlStr: string): boolean {
   }
 
   return false;
+}
+
+export async function safeAxiosGet(
+  url: string,
+  config?: AxiosRequestConfig
+): Promise<AxiosResponse> {
+  if (isPrivateUrl(url)) {
+    throw new Error("URL points to a private/internal address");
+  }
+  return axios.get(url, config);
 }

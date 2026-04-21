@@ -5,10 +5,18 @@ import db from "../../db.js";
 import { JWT_SECRET } from "../config.js";
 import { authenticate } from "../middleware/auth.js";
 import { validatePassword } from "../utils/validation.js";
+import { strictLimiter } from "../middleware/rateLimit.js";
 
 const router = Router();
 
-router.post("/login", async (req, res) => {
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: IS_PRODUCTION,
+};
+
+router.post("/login", strictLimiter, async (req, res) => {
   const { username, password } = req.body;
   const user = db
     .prepare("SELECT * FROM users WHERE username = ?")
@@ -19,9 +27,7 @@ router.post("/login", async (req, res) => {
   db.prepare("UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?").run(user.id);
   const token = jwt.sign({ id: user.id }, JWT_SECRET);
   res.cookie("token", token, {
-    httpOnly: true,
-    sameSite: "none",
-    secure: true,
+    ...COOKIE_OPTIONS,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
   });
   res.json({
@@ -58,7 +64,7 @@ router.get("/me", authenticate, (req, res) => {
 });
 
 router.post("/logout", (req, res) => {
-  res.clearCookie("token");
+  res.clearCookie("token", COOKIE_OPTIONS);
   res.json({ success: true });
 });
 

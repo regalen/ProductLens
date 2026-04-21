@@ -17,6 +17,7 @@ import imagesRouter, { publicImagesRouter } from "./routes/images.js";
 import exportRouter from "./routes/export.js";
 import configRouter from "./routes/config.js";
 import { purgeExpiredWorkflows } from "./utils/purge.js";
+import { looseLimiter } from "./middleware/rateLimit.js";
 
 // Ensure data directories exist
 for (const dir of [DATA_DIR, UPLOAD_DIR, PREVIEW_DIR, PROCESSED_DIR, WORKSPACE_DIR]) {
@@ -41,10 +42,14 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(cookieParser());
 
-  // --- Health check ---
+  // --- Health check (unlimited, used by Docker healthcheck) ---
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok" });
   });
+
+  // Global rate limit for /api routes. Stricter limits on /auth/login
+  // and /scrape are applied inline in their route handlers.
+  app.use("/api", looseLimiter);
 
   // --- Route registration ---
   app.use("/api/auth", authRouter);
