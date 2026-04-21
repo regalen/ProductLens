@@ -39,6 +39,11 @@ async function startServer() {
   const app = express();
   // PORT is imported from config.ts (defaults to 3000, configurable via PORT env var)
 
+  // Trust one upstream reverse proxy hop so express-rate-limit reads the real
+  // client IP from X-Forwarded-For instead of the proxy's IP. Without this
+  // every proxied request shares a rate-limit bucket.
+  app.set("trust proxy", 1);
+
   app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
   app.use(express.json({ limit: "50mb" }));
   app.use(cookieParser());
