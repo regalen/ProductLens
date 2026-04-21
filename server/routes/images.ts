@@ -4,6 +4,7 @@ import fs from "fs";
 import db from "../../db.js";
 import { PROCESSED_DIR } from "../config.js";
 import { authenticate } from "../middleware/auth.js";
+import { looseLimiter } from "../middleware/rateLimit.js";
 
 const router = Router();
 
@@ -108,12 +109,13 @@ export default router;
 // --- Public image serving (no authentication) ---
 // Exported separately — must be mounted at "/" in index.ts, not under "/api"
 export const publicImagesRouter = Router();
-publicImagesRouter.get("/images/:workflowId/:filename", (req, res) => {
-  const { workflowId, filename } = req.params;
+publicImagesRouter.get("/images/:workflowId/:filename", looseLimiter, (req, res) => {
+  const workflowId = req.params.workflowId ?? "";
+  const filename = req.params.filename ?? "";
 
   if (!/^[a-zA-Z0-9-]+$/.test(workflowId)) return res.status(400).send("Bad request");
   const safeFilename = path.basename(filename);
-  if (safeFilename !== filename) return res.status(400).send("Bad request");
+  if (safeFilename !== filename || safeFilename === "") return res.status(400).send("Bad request");
 
   const baseDir = path.resolve(PROCESSED_DIR);
   const filePath = path.resolve(baseDir, workflowId, safeFilename);

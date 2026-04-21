@@ -66,12 +66,23 @@ export function isPrivateUrl(urlStr: string): boolean {
   return false;
 }
 
+const ALLOWED_PROTOCOLS = new Set(["http:", "https:"]);
+
 export async function safeAxiosGet(
   url: string,
   config?: AxiosRequestConfig
 ): Promise<AxiosResponse> {
-  if (isPrivateUrl(url)) {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("Invalid URL");
+  }
+  if (!ALLOWED_PROTOCOLS.has(parsed.protocol)) {
+    throw new Error("Only http(s) URLs are allowed");
+  }
+  if (isPrivateUrl(parsed.href)) {
     throw new Error("URL points to a private/internal address");
   }
-  return axios.get(url, config);
+  return axios.get(parsed.href, config);
 }
