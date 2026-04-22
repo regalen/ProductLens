@@ -280,26 +280,16 @@ export function ReportDetail() {
                     <div>
                       <h3 className="font-bold text-slate-900">Delta</h3>
                       <p className="text-[10px] text-slate-400 uppercase tracking-widest">
-                        Rows in current that are not in previous (matched by
-                        IMSKU)
+                        New IMSKUs vs previous, with cleansing rules applied
                       </p>
                     </div>
                   </div>
                 </div>
                 <div className="flex gap-3 flex-wrap">
                   <a href={downloadUrl("delta")}>
-                    <Button
-                      variant="outline"
-                      className="font-bold uppercase tracking-wider text-xs"
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Delta
-                    </Button>
-                  </a>
-                  <a href={downloadUrl("cleansed_delta")}>
                     <Button className="bg-primary hover:bg-primary/90 text-white font-bold uppercase tracking-wider text-xs">
                       <Download className="w-4 h-4 mr-2" />
-                      Cleansed Delta
+                      Delta
                     </Button>
                   </a>
                 </div>

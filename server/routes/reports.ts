@@ -267,7 +267,7 @@ router.get(
         return res.status(404).json({ error: "Cleansed file missing on disk" });
       return res.download(p, `${country}_${label}.xlsx`);
     }
-    if (variant === "delta" || variant === "cleansed_delta") {
+    if (variant === "delta") {
       const prev = getReportRow(reportType, country, "previous");
       if (!prev)
         return res
@@ -276,12 +276,9 @@ router.get(
       const curPath = originalFilePath(reportType, country, "current");
       const prevPath = originalFilePath(reportType, country, "previous");
       try {
-        let wb = await buildDelta(curPath, prevPath);
-        if (variant === "cleansed_delta") wb = cleanseInMemory(wb);
-        const filename =
-          variant === "delta"
-            ? `${country}_Delta_${label}.xlsx`
-            : `${country}_Cleansed_Delta_${label}.xlsx`;
+        const rawDelta = await buildDelta(curPath, prevPath);
+        const wb = cleanseInMemory(rawDelta);
+        const filename = `${country}_Delta_${label}.xlsx`;
         res.setHeader("Content-Type", XLSX_MIME);
         res.setHeader(
           "Content-Disposition",
