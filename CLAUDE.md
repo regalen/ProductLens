@@ -4,7 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ProductLens is a full-stack image processing tool for automating ingestion, transformation, and export of product images. Built for Ingram Micro's content/catalog teams. Features multi-method image ingestion (upload, URL fetch, web scraping), custom processing pipelines (crop, resize, scale, convert, bulk rename), real-time previews, and bulk export (ZIP/XLSX).
+ProductLens is a full-stack tool for Ingram Micro's content/catalog teams. Two largely independent modules:
+
+1. **Image Processing** (the original module) — multi-method ingestion (upload, URL fetch, web scraping), custom processing pipelines (crop, resize, scale, convert, bulk rename), real-time previews, bulk export (ZIP/XLSX).
+2. **Reporting** — process Pimcore xlsx exports per country (AU/NZ): produce a cleansed version of the latest upload and a delta against the prior upload. See the Reporting module section below.
 
 ## Commands
 
@@ -30,11 +33,12 @@ Key env vars: `PORT` (default 3000, Docker default 3446), `BASE_URL` (external U
 
 ```
 server/
-  index.ts              — Express app setup, middleware, Vite integration, listen
-  config.ts             — PORT, BASE_URL, DATA_DIR, UPLOAD_DIR, PREVIEW_DIR, PROCESSED_DIR, WORKSPACE_DIR, CORS_ORIGIN, JWT_SECRET
-  types.ts              — DB row interfaces (UserRow, WorkflowRow, ImageRow, PipelineRow)
+  index.ts              — Express app setup, middleware, Vite integration, listen. Sets `app.set("trust proxy", 1)` so express-rate-limit reads the real client IP from X-Forwarded-For behind a single reverse-proxy hop.
+  config.ts             — PORT, BASE_URL, DATA_DIR, UPLOAD_DIR, PREVIEW_DIR, PROCESSED_DIR, REPORTS_DIR, WORKSPACE_DIR, CORS_ORIGIN, JWT_SECRET
+  types.ts              — DB row interfaces (UserRow, WorkflowRow, ImageRow, PipelineRow, ReportFileRow)
   middleware/
     auth.ts             — authenticate(), requireRole() middleware
+    rateLimit.ts        — looseLimiter (300/min, applied globally to /api) and strictLimiter (10/min, applied inline to /api/auth/login and /api/scrape)
   routes/
     auth.ts             — login, logout, change-password, me
     admin.ts            — user CRUD (admin only)
@@ -44,9 +48,13 @@ server/
     processing.ts       — processImage() helper, preview + process routes
     images.ts           — image delete/patch, asset/preview serving (auth + ownership), public /images/:workflowId/:filename (no auth)
     export.ts           — XLSX and ZIP export (ownership enforced)
+    reports.ts          — Reporting module: list report types, per-country state, upload, download (original / cleansed / delta). Shared org-level — no per-user scoping.
+    config.ts           — exposes runtime config to the frontend (currently `purgeDays`)
   utils/
-    validation.ts       — validatePassword, validateRole, validateWorkflowName, validatePipelineSteps
-    url.ts              — isPrivateUrl() for SSRF protection
+    validation.ts       — validatePassword, validateRole, validateWorkflowName, validatePipelineSteps, validateCountryCode, validateReportType
+    url.ts              — isPrivateUrl(), safeAxiosGet() for SSRF protection
+    purge.ts            — deleteWorkflowAndFiles(), purgeExpiredWorkflows() — sweeps workflows older than 7 days; reports are NOT touched
+    reports.ts          — Reporting helpers: validateUploadedWorkbook(), cleanseInMemory()/cleanseFile(), buildDelta()
 ```
 
 - `db.ts` (project root) initializes SQLite via `better-sqlite3` at `data/database.sqlite`. Schema with migration guards. Seeds default admin (admin/admin). Indexes on foreign keys.
@@ -60,6 +68,19 @@ server/
 - Public image URLs: `/images/{workflowId}/{filename}` — no auth, used in XLSX exports and "Copy Asset URL".
 - Exports: JSZip for ZIP, ExcelJS for XLSX (uses `BASE_URL` for public image links).
 - User activity tracking on the `users` table: `last_login_at` (UTC timestamp written by `POST /auth/login`; frontend displays in `Australia/Sydney` zone with an `AEST` label); lifetime counters `workflows_created_total` (incremented on workflow create) and `images_processed_total` (incremented once per batch after `Promise.all` in the `/process` route, not per image). These counters are **not** decremented by the 7-day purge — that's the point. Surfaced on the admin `/users` cards and in a hover tooltip over the header username.
+
+### Reporting module (`/api/reports`)
+
+- Independent from the image-processing domain: separate routes (`server/routes/reports.ts`), separate `report_files` table, no cross-references with workflows/pipelines/images.
+- Today supports one report type — `data_missing_webvisible` (Pimcore "Data_Missing_Report_Webvisible" export) — for two countries: `AU` and `NZ`. Adding a report type means appending to `REPORT_DEFINITIONS` in `server/routes/reports.ts` and `SUPPORTED_REPORT_TYPES` in `server/utils/validation.ts`.
+- Per (report, country) the system keeps **two slots** — `current` and `previous` — enforced by `UNIQUE (report_type, country, slot)` on `report_files`. On upload the old `previous` is deleted, `current` rotates into `previous`, and the new file becomes `current`. This is the minimum needed for the delta and keeps disk usage bounded.
+- Files live under `data/reports/{report_type}/{country}/{slot}/{original.xlsx,cleansed.xlsx}`. Slot rotation is by directory rename, not file copy.
+- **Shared org-level visibility** — every authenticated user (any role) sees the same `current`/`previous`. No per-user scoping. Reports are **not** subject to the 7-day workflow purge.
+- Upload is **strictly validated**: the workbook's first sheet must have the canonical 18 Pimcore columns in the exact order, and every row's `Country` cell must match the route param. Mismatches return `400` with a clear diff. The xlsx mime check is loose (`.xlsx` extension); ExcelJS surfaces malformed files.
+- **Cleansing rules** (applied to both Cleansed and Delta downloads): drop 9 junk columns (Language, Vendor_Code, Rich Media, Marketing Text, Similar Products, Accessories, Warranty, Compatibility Data, WebVisible); filter rows where `Images === '-'` AND `Specification === '-'`; sort by IMSKU as a **string** (lexicographic — preserves cell type, intentionally not numeric).
+- **Delta**: rows in `current` whose IMSKU is not in `previous` (IMSKU is the row identity), then run through the same cleansing rules.
+- Download filenames: `{COUNTRY}_Data_Missing_Report_Webvisible.xlsx` (cleansed), `{COUNTRY}_Delta_Data_Missing_Report_Webvisible.xlsx` (delta). Original is downloaded under the user's uploaded filename.
+- Multer cap on report uploads is 100MB (vs 50MB on the image-ingest route) — Pimcore exports of ~85k rows weigh in around 8MB but headroom matters.
 
 ## Docker
 
@@ -77,7 +98,7 @@ server/
 - React 19 + React Router DOM v7 + Tailwind CSS v4 + shadcn/ui (base-nova style).
 - Path alias: `@/*` maps to the project root (not `src/`).
 - State: AuthContext for auth, local component state elsewhere.
-- `src/pages/` — Route-level components: Dashboard, Login, WorkflowView, PipelineManager, UserManagement, ChangePassword.
+- `src/pages/` — Route-level components: Dashboard, Login, WorkflowView, PipelineManager, UserManagement, ChangePassword, Reporting (`/reporting`), ReportDetail (`/reporting/:reportType`).
 - `src/components/` — Feature components including Layout, PipelineBuilder, WorkflowStages/.
 - `components/` (root) — shadcn UI primitives.
 - `src/types.ts` — Shared TypeScript interfaces for Pipeline, Workflow, WorkflowImage, User.
@@ -94,6 +115,8 @@ Workflows progress through stages: **ingest** (upload/URL/scrape images) -> **co
 - Vitest with globals enabled, Node environment.
 - `tests/utils/url.test.ts` — SSRF protection tests
 - `tests/utils/validation.test.ts` — Input validation tests
+- `tests/utils/purge.test.ts` — 7-day workflow purge sweep tests (in-memory SQLite + real fs)
+- `tests/utils/reports.test.ts` — Cleanse + delta + upload-validation tests
 - `tests/middleware/auth.test.ts` — Auth middleware tests (mocked DB + JWT)
 
 ## TypeScript
@@ -106,14 +129,16 @@ Strict mode is enabled (`strict: true`, `noUncheckedIndexedAccess: true`). DB ro
 - WorkflowView uses 3s polling; no WebSocket support yet.
 - Local filesystem storage only (no S3/GCS).
 - Cheerio-based scraping cannot handle JavaScript-heavy sites.
-- Workflows are hard-purged 7 days after `created_at` by an hourly in-process sweep (see `server/utils/purge.ts`). All associated images, previews, and processed outputs are deleted alongside the workflow row.
+- Workflows are hard-purged 7 days after `created_at` by an hourly in-process sweep (see `server/utils/purge.ts`). All associated images, previews, and processed outputs are deleted alongside the workflow row. Reports are exempt.
+- Reporting keeps only the most recent two uploads per (report, country) — older uploads are not retained, no audit log of who uploaded what historically.
+- `app.set("trust proxy", 1)` assumes exactly one reverse-proxy hop between clients and the app. Stacking two proxies would let clients spoof their IP for rate-limit purposes; bump that number if your topology changes.
 
 ## Design Tokens
 
 - Primary blue: `#0077d4`
 - Font: Inter (loaded via Google Fonts)
 - App name is "ProductLens" (case-sensitive, no spaces)
-- Header nav items: Image Processing, Reporting, Add Ons, Taxonomy Mapping
+- Header nav items: Image Processing, Reporting (live), Add Ons (placeholder), Taxonomy Mapping (placeholder)
 
 ## Release Management
 
@@ -128,7 +153,7 @@ Strict mode is enabled (`strict: true`, `noUncheckedIndexedAccess: true`). DB ro
   - Append `!` (e.g. `feat!:`) or include `BREAKING CHANGE:` in the body to signal a MAJOR bump.
   - Optional scope is allowed: `feat(pipelines): …`, `fix(auth): …`.
 - The single source of truth for the app version is the `version` field in [package.json](package.json). Bump it in the same commit as the release (or in a dedicated `chore(release): vX.Y.Z` commit), and tag the release with `vX.Y.Z`.
-- **Current version: `0.1.0`** (first public release, 2026-04-15). The next `feat:`-only batch → `0.2.0`; a `fix:`-only batch → `0.1.1`; `1.0.0` is reserved for when the API contract is considered stable.
+- **Current version: `0.5.2`** (released 2026-04-22). `1.0.0` is reserved for when the API contract is considered stable.
 
 ## Committing Guidelines
 
