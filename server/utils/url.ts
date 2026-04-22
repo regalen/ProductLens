@@ -1,37 +1,22 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
+import dns from "dns";
+import http from "http";
+import https from "https";
 
 /**
- * SSRF protection — returns true if the URL resolves to a private/loopback address
- * that should not be reachable from the server.
+ * Returns true if the given IP address (not hostname) falls within a
+ * private, loopback, or link-local range.
  */
-export function isPrivateUrl(urlStr: string): boolean {
-  let parsed: URL;
-  try {
-    parsed = new URL(urlStr);
-  } catch {
-    // Unparseable URL — treat as unsafe
-    return true;
-  }
+export function isPrivateIp(ip: string): boolean {
+  const host = ip.toLowerCase();
 
-  const hostname = parsed.hostname.toLowerCase();
-
-  // Strip IPv6 brackets
-  const host = hostname.startsWith("[") && hostname.endsWith("]")
-    ? hostname.slice(1, -1)
-    : hostname;
-
-  // Loopback / localhost
-  if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
+  // Loopback
+  if (host === "127.0.0.1" || host === "::1" || host === "0:0:0:0:0:0:0:1") {
     return true;
   }
 
   // 0.0.0.0
   if (host === "0.0.0.0") {
-    return true;
-  }
-
-  // IPv6 loopback variants
-  if (host === "0:0:0:0:0:0:0:1" || host === "::1") {
     return true;
   }
 
@@ -45,26 +30,65 @@ export function isPrivateUrl(urlStr: string): boolean {
     /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/
   );
   if (ipv4Match) {
-    const [, a, b, c] = ipv4Match.map(Number);
+    const [, a, b] = ipv4Match.map(Number);
 
-    // 127.x.x.x
     if (a === 127) return true;
-
-    // 10.x.x.x
     if (a === 10) return true;
-
-    // 172.16.x.x – 172.31.x.x
     if (a === 172 && b !== undefined && b >= 16 && b <= 31) return true;
-
-    // 192.168.x.x
     if (a === 192 && b === 168) return true;
-
-    // 169.254.x.x (link-local)
     if (a === 169 && b === 254) return true;
   }
 
   return false;
 }
+
+/**
+ * SSRF protection — returns true if the URL's hostname is a known
+ * private/loopback address. This catches literal-IP URLs; DNS-resolved
+ * addresses are validated separately by the SSRF-safe HTTP agents.
+ */
+export function isPrivateUrl(urlStr: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(urlStr);
+  } catch {
+    return true;
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+  const host = hostname.startsWith("[") && hostname.endsWith("]")
+    ? hostname.slice(1, -1)
+    : hostname;
+
+  if (host === "localhost") return true;
+
+  return isPrivateIp(host);
+}
+
+/**
+ * Custom DNS lookup that rejects resolutions to private IPs.
+ * Passed as the `lookup` option to http(s).Agent so that every connection
+ * (including redirect hops) is validated after DNS resolution.
+ */
+function ssrfSafeLookup(
+  hostname: string,
+  options: dns.LookupOptions,
+  callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void
+): void {
+  dns.lookup(hostname, { ...options, all: false }, (err, address, family) => {
+    if (err) return callback(err, "", 0);
+    if (isPrivateIp(address)) {
+      const ssrfErr = new Error(
+        `URL resolves to a private/internal address (${address})`
+      );
+      return callback(ssrfErr as NodeJS.ErrnoException, "", 0);
+    }
+    callback(null, address, family);
+  });
+}
+
+const ssrfSafeHttpAgent = new http.Agent({ lookup: ssrfSafeLookup } as http.AgentOptions);
+const ssrfSafeHttpsAgent = new https.Agent({ lookup: ssrfSafeLookup } as https.AgentOptions);
 
 const ALLOWED_PROTOCOLS = new Set(["http:", "https:"]);
 
@@ -84,5 +108,9 @@ export async function safeAxiosGet(
   if (isPrivateUrl(parsed.href)) {
     throw new Error("URL points to a private/internal address");
   }
-  return axios.get(parsed.href, config);
+  return axios.get(parsed.href, {
+    ...config,
+    httpAgent: ssrfSafeHttpAgent,
+    httpsAgent: ssrfSafeHttpsAgent,
+  });
 }

@@ -25,7 +25,7 @@ router.post("/login", strictLimiter, async (req, res) => {
     return res.status(401).json({ error: "Invalid credentials" });
   }
   db.prepare("UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?").run(user.id);
-  const token = jwt.sign({ id: user.id }, JWT_SECRET);
+  const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "24h" });
   res.cookie("token", token, {
     ...COOKIE_OPTIONS,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours

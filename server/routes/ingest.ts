@@ -1,7 +1,6 @@
 import { Router } from "express";
 import path from "path";
 import fs from "fs";
-import axios from "axios";
 import * as cheerio from "cheerio";
 import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
@@ -304,7 +303,7 @@ router.post("/scrape", strictLimiter, authenticate, async (req, res) => {
           // SSRF protection for each discovered image URL
           if (isPrivateUrl(src)) return null;
           try {
-            const head = await axios.get(src, {
+            const head = await safeAxiosGet(src, {
               headers: {
                 Range: "bytes=0-65535",
                 "User-Agent": agents[0],

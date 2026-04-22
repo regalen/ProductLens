@@ -7,9 +7,13 @@ export function validateRole(role: string): boolean {
   return ["user", "pipeline_editor", "admin"].includes(role);
 }
 
+const SAFE_NAME_RE = /^[a-zA-Z0-9 _\-.,()&+'#]+$/;
+
 export function validateWorkflowName(name: string): string | null {
   if (!name || name.trim().length === 0) return "Name is required";
   if (name.length > 200) return "Name too long";
+  if (!SAFE_NAME_RE.test(name))
+    return "Name contains invalid characters. Use letters, numbers, spaces, hyphens, underscores, and basic punctuation only.";
   return null;
 }
 

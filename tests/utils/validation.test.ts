@@ -73,6 +73,31 @@ describe('validateWorkflowName', () => {
   it('accepts "My Workflow"', () => {
     expect(validateWorkflowName('My Workflow')).toBeNull();
   });
+
+  it('accepts names with common punctuation', () => {
+    expect(validateWorkflowName("Product's #1 (AU) & NZ - test_run")).toBeNull();
+  });
+
+  it('rejects path traversal with ../', () => {
+    expect(validateWorkflowName('../../etc/passwd')).not.toBeNull();
+  });
+
+  it('rejects forward slashes', () => {
+    expect(validateWorkflowName('foo/bar')).not.toBeNull();
+  });
+
+  it('rejects backslashes', () => {
+    expect(validateWorkflowName('foo\\bar')).not.toBeNull();
+  });
+
+  it('rejects null bytes', () => {
+    expect(validateWorkflowName('foo\x00bar')).not.toBeNull();
+  });
+
+  it('rejects control characters', () => {
+    expect(validateWorkflowName('foo\nbar')).not.toBeNull();
+    expect(validateWorkflowName('foo\tbar')).not.toBeNull();
+  });
 });
 
 describe('validatePipelineSteps', () => {

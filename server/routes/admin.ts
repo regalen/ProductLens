@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import db from "../../db.js";
 import { authenticate, requireRole } from "../middleware/auth.js";
 import { validatePassword, validateRole } from "../utils/validation.js";
+import { deleteWorkflowAndFiles } from "../utils/purge.js";
 
 const router = Router();
 
@@ -73,9 +74,43 @@ router.delete(
   authenticate,
   requireRole(["admin"]),
   (req, res) => {
-    if (req.params.id === req.user!.id)
+    const userId = req.params.id!;
+    if (userId === req.user!.id)
       return res.status(400).json({ error: "Cannot delete yourself" });
-    db.prepare("DELETE FROM users WHERE id = ?").run(req.params.id);
+
+    const user = db
+      .prepare("SELECT id FROM users WHERE id = ?")
+      .get(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // Delete all workflows (and their images/files) owned by this user
+    const workflows = db
+      .prepare("SELECT id FROM workflows WHERE user_id = ?")
+      .all(userId) as Array<{ id: string }>;
+    for (const wf of workflows) {
+      deleteWorkflowAndFiles(wf.id);
+    }
+
+    // Nullify pipeline references before deleting pipelines
+    const pipelines = db
+      .prepare("SELECT id FROM pipelines WHERE user_id = ?")
+      .all(userId) as Array<{ id: string }>;
+
+    db.transaction(() => {
+      for (const p of pipelines) {
+        db.prepare("UPDATE workflows SET pipeline_id = NULL WHERE pipeline_id = ?").run(p.id);
+      }
+      db.prepare("DELETE FROM pipelines WHERE user_id = ?").run(userId);
+
+      // Reassign report_files to the admin performing the deletion
+      db.prepare("UPDATE report_files SET uploaded_by = ? WHERE uploaded_by = ?").run(
+        req.user!.id,
+        userId
+      );
+
+      db.prepare("DELETE FROM users WHERE id = ?").run(userId);
+    })();
+
     res.json({ success: true });
   }
 );

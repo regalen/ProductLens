@@ -97,9 +97,13 @@ async function startServer() {
     );
   }
 
-  app.use((err: any, req: any, res: any, next: any) => {
+  app.use((err: any, _req: any, res: any, _next: any) => {
     console.error("Unhandled error:", err);
-    res.status(500).json({ error: err.message || "Internal server error" });
+    const message =
+      process.env.NODE_ENV === "production"
+        ? "Internal server error"
+        : err.message || "Internal server error";
+    res.status(500).json({ error: message });
   });
 
   app.listen(PORT, "0.0.0.0", () =>

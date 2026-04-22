@@ -42,6 +42,21 @@ export async function processImage(
   );
   for (const step of pipeline) {
     console.log(`Applying step: ${step.type}`, step);
+
+    // Steps that don't need current dimensions or background sampling
+    // can chain directly without a costly toBuffer() round-trip.
+    if (step.type === "convert") {
+      processor = processor.toFormat(step.format || "jpeg", {
+        quality: step.quality || 90,
+      });
+      continue;
+    }
+    if (step.type === "rename") {
+      // Handled in the route, no-op here
+      continue;
+    }
+
+    // Dimension-dependent steps: materialize the buffer to read current size
     const { data: encodedData, info: encodedInfo } = await processor.toBuffer({
       resolveWithObject: true,
     });
@@ -101,7 +116,6 @@ export async function processImage(
             const targetRatio = rw / rh;
             let extractRect;
             if (currentRatio > targetRatio) {
-              // Image is wider than target
               const newWidth = Math.floor(encodedInfo.height * targetRatio);
               extractRect = {
                 left: Math.floor((encodedInfo.width - newWidth) / 2),
@@ -110,7 +124,6 @@ export async function processImage(
                 height: encodedInfo.height,
               };
             } else {
-              // Image is taller than target
               const newHeight = Math.floor(encodedInfo.width / targetRatio);
               extractRect = {
                 left: 0,
@@ -124,7 +137,6 @@ export async function processImage(
         } else if (step.cropMode === "manual" && step.manualRect) {
           const { left, top, width, height } = step.manualRect;
           if (width > 0 && height > 0) {
-            // Clamp values to image dimensions
             const safeLeft = Math.max(
               0,
               Math.min(left || 0, encodedInfo.width - 1)
@@ -143,7 +155,6 @@ export async function processImage(
             });
           }
         } else {
-          // Default: crop to content
           processor = processor.trim({
             background: sampledBackground,
             threshold: step.threshold || 10,
@@ -158,14 +169,6 @@ export async function processImage(
             });
         }
         processor = processor.flatten({ background: { r: 255, g: 255, b: 255 } });
-        break;
-      case "convert":
-        processor = processor.toFormat(step.format || "jpeg", {
-          quality: step.quality || 90,
-        });
-        break;
-      case "rename":
-        // Handled in the route, no-op here
         break;
     }
   }

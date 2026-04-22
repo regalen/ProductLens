@@ -28,10 +28,7 @@ WORKDIR /app
 
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/server ./server
-COPY --from=build /app/db.ts ./db.ts
 COPY --from=build /app/package.json ./package.json
-COPY --from=build /app/tsconfig.json ./tsconfig.json
 
 ENV NODE_ENV=production
 ENV PORT=3446
@@ -40,4 +37,4 @@ ENV WORKSPACE_DIR=/tmp/workspace
 
 EXPOSE 3446
 
-CMD ["node", "--import", "tsx", "server/index.ts"]
+CMD ["node", "dist/server/server/index.js"]
