@@ -69,19 +69,44 @@ export function isPrivateUrl(urlStr: string): boolean {
  * Custom DNS lookup that rejects resolutions to private IPs.
  * Passed as the `lookup` option to http(s).Agent so that every connection
  * (including redirect hops) is validated after DNS resolution.
+ *
+ * Must mirror the caller's `options.all` shape: Node's HTTP agent (Node 20+
+ * with autoSelectFamily / HappyEyeballs) calls lookup with `all: true` and
+ * expects an array of `{address, family}` back; older callers may use
+ * `all: false` and expect a single (address, family) pair. Returning the
+ * wrong shape causes Node to throw ERR_INVALID_IP_ADDRESS: undefined.
  */
 function ssrfSafeLookup(
   hostname: string,
   options: dns.LookupOptions,
-  callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void
+  // The agent's lookup callback signature is overloaded depending on options.all.
+  callback: (err: NodeJS.ErrnoException | null, ...args: unknown[]) => void,
 ): void {
+  if (options.all === true) {
+    dns.lookup(hostname, { ...options, all: true }, (err, addresses) => {
+      if (err) return callback(err);
+      for (const entry of addresses) {
+        if (isPrivateIp(entry.address)) {
+          return callback(
+            new Error(
+              `URL resolves to a private/internal address (${entry.address})`,
+            ) as NodeJS.ErrnoException,
+          );
+        }
+      }
+      callback(null, addresses);
+    });
+    return;
+  }
+
   dns.lookup(hostname, { ...options, all: false }, (err, address, family) => {
-    if (err) return callback(err, "", 0);
+    if (err) return callback(err);
     if (isPrivateIp(address)) {
-      const ssrfErr = new Error(
-        `URL resolves to a private/internal address (${address})`
+      return callback(
+        new Error(
+          `URL resolves to a private/internal address (${address})`,
+        ) as NodeJS.ErrnoException,
       );
-      return callback(ssrfErr as NodeJS.ErrnoException, "", 0);
     }
     callback(null, address, family);
   });
