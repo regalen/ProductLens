@@ -153,7 +153,7 @@ Strict mode is enabled (`strict: true`, `noUncheckedIndexedAccess: true`). DB ro
   - Append `!` (e.g. `feat!:`) or include `BREAKING CHANGE:` in the body to signal a MAJOR bump.
   - Optional scope is allowed: `feat(pipelines): …`, `fix(auth): …`.
 - The single source of truth for the app version is the `version` field in [package.json](package.json). Bump it in the same commit as the release (or in a dedicated `chore(release): vX.Y.Z` commit), and tag the release with `vX.Y.Z`.
-- **Current version: `0.5.2`** (released 2026-04-22). `1.0.0` is reserved for when the API contract is considered stable.
+- **Current version: `0.6.0`** (released 2026-04-28). `1.0.0` is reserved for when the API contract is considered stable.
 
 ## Committing Guidelines
 
