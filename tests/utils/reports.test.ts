@@ -67,15 +67,21 @@ const baseRow = (overrides: RowData = {}): RowData => ({
 });
 
 describe("cleanseInMemory", () => {
-  it("drops the nine junk columns and keeps the rest in canonical order", () => {
+  it("drops the junk columns, keeps the rest in canonical order, and appends an Action column", () => {
     const wb = buildFixture([baseRow({ IMSKU: "1" })]);
     const out = cleanseInMemory(wb);
-    const { headers } = readSheetRows(out);
+    const { headers, rows } = readSheetRows(out);
     for (const dropped of COLUMNS_TO_DROP) {
       expect(headers).not.toContain(dropped);
     }
-    const expected = CANONICAL_HEADERS.filter((h) => !COLUMNS_TO_DROP.has(h));
+    const expected = [
+      ...CANONICAL_HEADERS.filter((h) => !COLUMNS_TO_DROP.has(h)),
+      "Action",
+    ];
     expect(headers).toEqual(expected);
+    expect(headers[headers.length - 1]).toBe("Action");
+    expect(headers.indexOf("Action")).toBe(headers.indexOf("Specification") + 1);
+    expect(rows[0]![headers.indexOf("Action")]).toBe("");
   });
 
   it("filters out rows where Images === '-' AND Specification === '-'", () => {

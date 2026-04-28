@@ -22,6 +22,7 @@ export const CANONICAL_HEADERS = [
 ] as const;
 
 export const COLUMNS_TO_DROP = new Set<string>([
+  "Country",
   "Language",
   "Vendor_Code",
   "Rich Media",
@@ -32,6 +33,8 @@ export const COLUMNS_TO_DROP = new Set<string>([
   "Compatibility Data",
   "WebVisible",
 ]);
+
+export const APPENDED_HEADERS = ["Action"] as const;
 
 export function cellToString(v: unknown): string {
   if (v == null) return "";
@@ -163,8 +166,10 @@ export function cleanseInMemory(wb: ExcelJS.Workbook): ExcelJS.Workbook {
 
   const out = new ExcelJS.Workbook();
   const outSheet = out.addWorksheet(srcSheet.name || "Sheet1");
-  outSheet.addRow(keptHeaders);
-  for (const rec of records) outSheet.addRow(rec.values);
+  outSheet.addRow([...keptHeaders, ...APPENDED_HEADERS]);
+  for (const rec of records) {
+    outSheet.addRow([...rec.values, ...APPENDED_HEADERS.map(() => null)]);
+  }
   return out;
 }
 
