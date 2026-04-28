@@ -5,6 +5,11 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   ArrowLeft,
   Download,
   Upload as UploadIcon,
@@ -239,6 +244,23 @@ export function ReportDetail() {
                         Cleansed
                       </Button>
                     </a>
+                    {state.hasDelta && (
+                      <Tooltip>
+                        <TooltipTrigger render={<span className="inline-flex" />}>
+                          <a href={downloadUrl("delta")}>
+                            <Button className="bg-primary hover:bg-primary/90 text-white font-bold uppercase tracking-wider text-xs">
+                              <GitCompare className="w-4 h-4 mr-2" />
+                              Delta
+                            </Button>
+                          </a>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-[10px] font-bold">
+                            New IMSKUs vs previous, with cleansing rules applied
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -267,32 +289,6 @@ export function ReportDetail() {
                   </div>
                 </div>
                 <MetadataRow summary={state.previous} />
-              </Card>
-            )}
-
-            {state?.hasDelta && (
-              <Card className="p-6 bg-white border-slate-200 shadow-sm space-y-5">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
-                      <GitCompare className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900">Delta</h3>
-                      <p className="text-[10px] text-slate-400 uppercase tracking-widest">
-                        New IMSKUs vs previous, with cleansing rules applied
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex gap-3 flex-wrap">
-                  <a href={downloadUrl("delta")}>
-                    <Button className="bg-primary hover:bg-primary/90 text-white font-bold uppercase tracking-wider text-xs">
-                      <Download className="w-4 h-4 mr-2" />
-                      Delta
-                    </Button>
-                  </a>
-                </div>
               </Card>
             )}
 
